@@ -1,5 +1,5 @@
 import numpy as np
-from data_prep import data, features, targets
+from data_prep import data, features, targets, features_test, targets_test
 from sys import exit
 
 visualize_mode = True
@@ -10,17 +10,17 @@ if visualize_mode:
 def main():
     nn = NeuralNetwork()
     nn.train(features, targets)
-    nn.test(features, targets)
-    nn.plot_boundary(data)
+    nn.test(features_test, targets_test)
+    nn.plot_boundary(features_test, targets_test)
     exit(0)
 
 
 class NeuralNetwork:
 
-    def __init__(self, activate_hidden_layers=True, hidden_layers=(2,),
-                 epochs=1000, learning_rate=0.5, bias=True,
+    def __init__(self, activate_hidden_layers=True, hidden_layers=(30,30),
+                 epochs=2000, learning_rate=0.5, bias=True,
                  type_loss_function="CE", type_activation_hidden="sigmoid",
-                 debug=False, graph=False, random_seed=42):
+                 debug=True, graph=False, random_seed=42):
         """
         [describe]: initialize hyper parameters
         activate_hidden_layers: boolean, The architecture of NN has hidden layers or not
@@ -197,6 +197,9 @@ class NeuralNetwork:
         # Initialize flag to warn you if the error is increasing
         last_loss = None
         #########################################################################################
+        # Conver from pd.Datafram into numpy
+        features, targets = np.array(features), np.array(targets)
+        #########################################################################################
         # extract metadata from the data to train the NN
         self.__extract_metadata(features, targets)
         # #########################################################################################
@@ -263,11 +266,17 @@ class NeuralNetwork:
                 # Display the results
                 print(f"Train accuracy: {accuracy :0.3f}")
                 print()
+                if accuracy == 1:
+                    return
                 #########################################################################################
                 # Update the flag
                 last_loss = loss
 
     def test(self, features_test, targets_test):
+        #########################################################################################
+        # Conver from pd.Datafram into numpy
+        features_test, targets_test = np.array(
+            features_test), np.array(targets_test)
         #########################################################################################
         # Feed forward process to get accuracy results
         outputs = self.__feedForward(features_test)
@@ -281,8 +290,8 @@ class NeuralNetwork:
         print(f"Test accuracy: {accuracy :0.3f}")
         print()
 
-    def plot_boundary(self, data, x1_start=-1.5, x1_stop=1.5, x1_n_values=100,
-                      x2_start=-1.5, x2_stop=1.5, x2_n_values=100):
+    def plot_boundary(self, features, targets, x1_n_values=100,
+                      x2_n_values=100):
 
         condition = self.__n_features == 2
         if not condition:
@@ -295,6 +304,15 @@ class NeuralNetwork:
 
         left, bottom, width, height = 0.1, 0.1, 0.8, 0.8
         ax = fig.add_axes([left, bottom, width, height])
+
+        scale_factor = 0.25
+        x1_start, x1_stop = features['x1'].min(), features['x1'].max()
+        x1_start += scale_factor * x1_start
+        x1_stop  += scale_factor * x1_stop
+
+        x2_start, x2_stop = features['x2'].min(), features['x2'].max()
+        x2_start += scale_factor * x2_start
+        x2_stop  += scale_factor * x2_stop
 
         x1_vals = np.linspace(x1_start, x1_stop, x1_n_values)
         x2_vals = np.linspace(x2_start, x2_stop, x2_n_values)
@@ -313,15 +331,19 @@ class NeuralNetwork:
         ax.set_title('Boundary line')
         ax.set_xlabel('X1')
         ax.set_ylabel('X2')
-        plt.xlim(-1.2, 1.2)
-        plt.ylim(-1.2, 1.2)
+
         # add points
-        self.__plot_points(data, "Descition boundary")
+        self.__plot_points(features, targets, "Descition boundary")
+        # plt.xlim(x1_start + scale_factor * x1_start,
+        #          x1_stop + scale_factor * x1_stop)
+        # plt.ylim(x2_start + scale_factor * x2_start,
+        #          x2_stop + scale_factor * x2_stop)
+        # plt.ylim(x2_start, x2_stop)
         plt.show()
 
-    def __plot_points(self, data, title):
-        admitted = data[data['y'] == 1]
-        rejected = data[data['y'] == 0]
+    def __plot_points(self, features, targets, title):
+        admitted = features[targets == 1]
+        rejected = features[targets == 0]
         plt.scatter(admitted['x1'], admitted['x2'],
                     s=25, color='cyan', edgecolor='k')
         plt.scatter(rejected['x1'], rejected['x2'],
@@ -329,6 +351,7 @@ class NeuralNetwork:
         plt.xlabel('x1')
         plt.ylabel('x2')
         plt.title(title)
+
         pass
 
 
