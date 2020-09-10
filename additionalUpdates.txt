@@ -1,3 +1,5 @@
-1_Add bias into __in_layers (hidden layers) take care of weights and error terms
-2_plot nonlinear boundary
+1_Add bias into __in_layers (hidden layers) take care of weights and error terms --> done
+2_plot nonlinear boundary --> Done
+
 3_Need other activation function like softmax, Relu
+4_Add JSON file collects all the atributes in one place

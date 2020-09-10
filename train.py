@@ -16,9 +16,11 @@ def main():
 
 
 class NeuralNetwork:
-    def __init__(self, activate_hidden_layers=False, hidden_layers=(2,),
-                 epochs=1000, learning_rate=0.1, bias=True,
-                 type_loss_function="CE", type_activation_hidden="sigmoid", graph=False, random_seed=42):
+
+    def __init__(self, activate_hidden_layers=True, hidden_layers=(2,),
+                 epochs=1000, learning_rate=0.5, bias=True,
+                 type_loss_function="CE", type_activation_hidden="sigmoid",
+                 debug=False, graph=False, random_seed=42):
         """
         [describe]: initialize hyper parameters
         activate_hidden_layers: boolean, The architecture of NN has hidden layers or not
@@ -30,7 +32,8 @@ class NeuralNetwork:
         and used in updating the weights
         graph: as debug mode
         """
-        np.random.seed(random_seed)
+        if debug:
+            np.random.seed(random_seed)
         self.__activate_hidden_layers = activate_hidden_layers
         self.__hidden_layers = hidden_layers
         self.__epochs = epochs
@@ -39,6 +42,8 @@ class NeuralNetwork:
         self.__type_loss_function = type_loss_function  # 'CE' / 'SE'
         self.__type_activation_hidden = type_activation_hidden  # "sigmoid"
         self.__graph = graph
+        self.__debug = debug
+
         self.__n_records = None
         self.__n_features = None
         self.__n_classes = None
@@ -62,7 +67,8 @@ class NeuralNetwork:
             n_hidden_layers = len(self.__hidden_layers)
 
         self.__weights = [None for _ in range(n_hidden_layers + 1)]
-        n_rows = self.__n_features
+
+        n_rows = self.__n_features + self.__bias
         # It will iterate if there are hidden layers
         # if self.__activate_hidden_layers is true
         for i in range(len(self.__weights) - 1):
@@ -70,7 +76,7 @@ class NeuralNetwork:
             self.__weights[i] = np.random.normal(loc=0, scale=np.power(self.__n_features, -0.5),
                                                  size=(n_rows, self.__hidden_layers[i]))
             # update number of rows of the matrix weight
-            n_rows = self.__hidden_layers[i]
+            n_rows = self.__hidden_layers[i] + + self.__bias
         # The weights connect the layer(input or hidden) with output layer
         self.__weights[-1] = np.random.normal(loc=0, scale=np.power(self.__n_features, -0.5),
                                               size=(n_rows, self.__n_classes))
@@ -98,6 +104,15 @@ class NeuralNetwork:
         # initialize in_signal that inputs into the the neurons
         in_signal = x
         for i in range(n_weights):
+            # Add bias to in_signal if its true
+            if self.__bias:
+                if in_signal.ndim == 1:
+                    m_rows = 1
+                    in_signal = np.r_[in_signal, np.ones(m_rows)]
+                else:
+                    m_rows = in_signal.shape[0]
+                    in_signal = np.c_[in_signal, np.ones(m_rows)]
+
             # linear combinations
             self.__in_layers[i] = np.dot(in_signal, self.__weights[i])
             self.__out_layers[i] = self.__activation(
@@ -124,9 +139,6 @@ class NeuralNetwork:
         error = y - output
         if error.ndim == 1:
             error = error.reshape(1, -1)
-        if self.__graph:
-            print("error CE: ", error)
-            print("error SE: ", error * output * (1 - output))
         if self.__type_loss_function == 'CE':  # Cross Entopy
             return error
         elif self.__type_loss_function == 'SE':  # Square Error
@@ -134,15 +146,15 @@ class NeuralNetwork:
 
     def __calculate_error_terms(self, y, output):
         n_weights = len(self.__weights)
-        if self.__graph:
-            print("n_weights: ", n_weights)
         self.__error_terms = [None for _ in range(n_weights)]
         # Calculate the first error term related to the output
         self.__error_terms[-1] = self.__calculate_out_error_term(y, output)
         for i in range(n_weights - 2, -1, -1):
-
-            error = np.matmul(
-                self.__error_terms[i + 1], self.__weights[i + 1].T)
+            w = self.__weights[i + 1]
+            if self.__bias:
+                # Dont take last row in calculations
+                w = w[:-1, :]
+            error = np.matmul(self.__error_terms[i + 1], w.T)
             activation_prime = None
             if self.__type_activation_hidden == 'sigmoid':
                 out_layer = self.__out_layers[i]
@@ -160,29 +172,23 @@ class NeuralNetwork:
                 in_signal = x
             else:
                 in_signal = self.__out_layers[i-1]
-            error_term = self.__error_terms[i]
-            if self.__graph:
-                print(f"in_signal = {in_signal}")
-                print(f"error_term = {error_term}")
+            # Add bias to in_signal if its true
+            if self.__bias:
+                if in_signal.ndim == 1:
+                    m_rows = 1
+                    in_signal = np.r_[in_signal, np.ones(m_rows)]
+                else:
+                    m_rows = in_signal.shape[0]
+                    in_signal = np.c_[in_signal, np.ones(m_rows)]
 
+            error_term = self.__error_terms[i]
             gradient = None
             if in_signal.ndim == 2:
                 gradient = np.matmul(in_signal.T, error_term)
             elif in_signal.ndim == 1:
-                if self.__graph:
-                    print(f"in_signal[:, None]: {in_signal[:, None]}")
                 gradient = np.matmul(in_signal[:, None], error_term)
-
             del_w = self.__learning_rate * gradient
-            if self.__graph:
-                print("Before Update:  ")
-                print(f"self.__weights[{i}] = {self.__weights[i]}")
             self.__weights[i] += del_w
-            if self.__graph:
-                print("After Update:  ")
-                print(f"gradient = {gradient}")
-                print(f"del_w = {self.__learning_rate * gradient}")
-                print(f"self.__weights[{i}] = {self.__weights[i]}")
 
         pass
 
@@ -193,15 +199,10 @@ class NeuralNetwork:
         #########################################################################################
         # extract metadata from the data to train the NN
         self.__extract_metadata(features, targets)
-        if self.__bias:
-            # Add column of one to data as constant value to use the bias in weights
-            features = np.c_[features, np.ones(self.__n_records)]
-            self.__n_features += 1
-        #########################################################################################
+        # #########################################################################################
         # Add the weights for the NN
         self.__addWeights()
-        if self.__graph:
-            print("After apply __addWeights function, __weights: ", self.__weights)
+
         #########################################################################################
         # Iterate over the epochs
         for e in range(self.__epochs):
@@ -215,13 +216,6 @@ class NeuralNetwork:
                 #########################################################################################
 
                 output = self.__feedForward(x)
-                if self.__graph:
-                    print("After apply __feedForward function, output: ", output)
-                    for i in range(len(self.__in_layers)):
-                        print(
-                            f"After apply __feedForward function, in: __in_layers[{i}]", self.__in_layers[i])
-                        print(
-                            f"After apply __feedForward function, in: __out_layers[{i}]", self.__out_layers[i])
                 #########################################################################################
                 #########################################################################################
                 ################ Backpropagation process ################################################
@@ -229,18 +223,14 @@ class NeuralNetwork:
                 #########################################################################################
                 # Caluclate the error_terms
                 self.__calculate_error_terms(y, output)
-                if self.__graph:
-                    print(
-                        f"After apply __calculate_error_terms function, __error_terms: {self.__error_terms}")
-                    for i in range(len(self.__error_terms)):
-                        print(f"__error_terms[{i}].shape",
-                              self.__error_terms[i].shape)
+
                 #########################################################################################
                 # Update weights
                 self.__updateWeights(x)
             #########################################################################################
             # Show resuluts over each tenths epochs
-            if not self.__graph and (e/10) % 10 == 0:
+            if e % (self.__epochs / 10) == 0:
+                print("\n========== Epoch", e, "==========")
                 #########################################################################################
                 #########################################################################################
                 ################ Caluclate Loss function ################################################
@@ -279,27 +269,22 @@ class NeuralNetwork:
 
     def test(self, features_test, targets_test):
         #########################################################################################
-        # Needs update to get better performance
-        if self.__bias:
-            # Add column of one to data as constant value to use the bias in weights
-            features_test = np.c_[features_test, np.ones(self.__n_records)]
-        #########################################################################################
         # Feed forward process to get accuracy results
         outputs = self.__feedForward(features_test)
         targets_test = targets_test.reshape(outputs.shape)
         predictions = outputs >= 0.5
+        print("Predictions:")
         print(predictions)
         accuracy = np.mean(predictions == targets_test)
         #########################################################################################
         # Display the results
         print(f"Test accuracy: {accuracy :0.3f}")
+        print()
 
     def plot_boundary(self, data, x1_start=-1.5, x1_stop=1.5, x1_n_values=100,
                       x2_start=-1.5, x2_stop=1.5, x2_n_values=100):
 
-        condition1 = self.__n_features == 2 and self.__bias == False
-        condition2 = self.__n_features == 3 and self.__bias == True
-        condition = condition1 or condition2
+        condition = self.__n_features == 2
         if not condition:
             print(f"__n_features should be 2d to visualize")
             print(f"self.__n_features = {self.__n_features}")
@@ -315,12 +300,16 @@ class NeuralNetwork:
         x2_vals = np.linspace(x2_start, x2_stop, x2_n_values)
         X1, X2 = np.meshgrid(x1_vals, x2_vals)
 
-        w = self.__weights[0]
-        print(w)
-        Z = w[0] * X1 + w[1] * X2
-        if self.__bias:
-            Z += w[2]
-        contour = plt.contour(X1, X2, Z, levels=[0])
+        m = x1_n_values
+        n = x2_n_values
+        Z = np.zeros((m, n))
+
+        for i in range(m):
+            for j in range(n):
+                self.__feedForward(np.array([X1[i, j], X2[i, j]]))
+                Z[i, j] = self.__in_layers[-1]
+
+        plt.contour(X1, X2, Z, levels=[0])
         ax.set_title('Boundary line')
         ax.set_xlabel('X1')
         ax.set_ylabel('X2')
@@ -328,7 +317,6 @@ class NeuralNetwork:
         plt.ylim(-1.2, 1.2)
         # add points
         self.__plot_points(data, "Descition boundary")
-
         plt.show()
 
     def __plot_points(self, data, title):

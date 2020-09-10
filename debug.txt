@@ -1,38 +1,57 @@
-Train loss: 0.5402865217609369    
-Train accuracy: 0.750
 
-Train loss: 0.08293544364556615    
-Train accuracy: 1.000
+========== Epoch 0 ==========
+Train loss: 0.7162554913472792    
+Train accuracy: 0.250
 
-Train loss: 0.04478607239275494    
-Train accuracy: 1.000
 
-Train loss: 0.030475081247710475    
-Train accuracy: 1.000
+========== Epoch 100 ==========
+Train loss: 0.7019782968950703    
+Train accuracy: 0.500
 
-Train loss: 0.023037068197158533    
-Train accuracy: 1.000
 
-Train loss: 0.018495233294546748    
-Train accuracy: 1.000
+========== Epoch 200 ==========
+Train loss: 0.7019782968950703    
+Train accuracy: 0.500
 
-Train loss: 0.015439091414648541    
-Train accuracy: 1.000
 
-Train loss: 0.013244373009594582    
-Train accuracy: 1.000
+========== Epoch 300 ==========
+Train loss: 0.7019782968950703    
+Train accuracy: 0.500
 
-Train loss: 0.011592919545931666    
-Train accuracy: 1.000
 
-Train loss: 0.010305786969498697    
-Train accuracy: 1.000
+========== Epoch 400 ==========
+Train loss: 0.7019782968950703    
+Train accuracy: 0.500
 
-[[False]
+
+========== Epoch 500 ==========
+Train loss: 0.7019782968950703    
+Train accuracy: 0.500
+
+
+========== Epoch 600 ==========
+Train loss: 0.7019782968950703    
+Train accuracy: 0.500
+
+
+========== Epoch 700 ==========
+Train loss: 0.7019782968950703    
+Train accuracy: 0.500
+
+
+========== Epoch 800 ==========
+Train loss: 0.7019782968950703    
+Train accuracy: 0.500
+
+
+========== Epoch 900 ==========
+Train loss: 0.7019782968950703    
+Train accuracy: 0.500
+
+Predictions:
+[[ True]
+ [False]
  [ True]
- [ True]
- [ True]]
-Test accuracy: 1.000
-[[5.04025261]
- [5.03977548]
- [4.43369541]]
+ [False]]
+Test accuracy: 0.500
+

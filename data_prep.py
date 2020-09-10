@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 
-data = pd.read_csv('or.csv')
+data = pd.read_csv('xor.csv')
 
 # process data
 # data['bias'] = 1
