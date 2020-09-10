@@ -1,16 +1,23 @@
 import numpy as np
-from data_prep import features, targets
+from data_prep import data, features, targets
+from sys import exit
+
+visualize_mode = True
+if visualize_mode:
+    import matplotlib.pyplot as plt
 
 
 def main():
     nn = NeuralNetwork()
     nn.train(features, targets)
     nn.test(features, targets)
+    nn.plot_boundary(data)
+    exit(0)
 
 
 class NeuralNetwork:
-    def __init__(self, activate_hidden_layers=True, hidden_layers=(4,),
-                 epochs=1000, learning_rate=2,
+    def __init__(self, activate_hidden_layers=False, hidden_layers=(2,),
+                 epochs=1000, learning_rate=0.1, bias=True,
                  type_loss_function="CE", type_activation_hidden="sigmoid", graph=False, random_seed=42):
         """
         [describe]: initialize hyper parameters
@@ -18,6 +25,7 @@ class NeuralNetwork:
         hidden_layers: tuple of nurons in each hidden layer in order
         epochs: number of iterations for NN to learn
         learning_rate: scaling the gradient descent to improve the stability of learning
+        bias: Add bias (shift the boundary descition) or Not
         type_loss_function: the type of loss function that used as measure of the error
         and used in updating the weights
         graph: as debug mode
@@ -27,6 +35,7 @@ class NeuralNetwork:
         self.__hidden_layers = hidden_layers
         self.__epochs = epochs
         self.__learning_rate = learning_rate
+        self.__bias = bias  # add bias or not
         self.__type_loss_function = type_loss_function  # 'CE' / 'SE'
         self.__type_activation_hidden = type_activation_hidden  # "sigmoid"
         self.__graph = graph
@@ -138,6 +147,9 @@ class NeuralNetwork:
             if self.__type_activation_hidden == 'sigmoid':
                 out_layer = self.__out_layers[i]
                 activation_prime = out_layer * (1 - out_layer)
+            else:
+                print("Need other activation function")
+                exit(1)
             self.__error_terms[i] = error * activation_prime
 
     def __updateWeights(self, x):
@@ -175,42 +187,33 @@ class NeuralNetwork:
         pass
 
     def train(self, features, targets):
+        #########################################################################################
+        # Initialize flag to warn you if the error is increasing
         last_loss = None
         #########################################################################################
-        if self.__graph:
-            print(f"features: {features}")
-            print(f"targets: {targets}")
-            print(f"learn_rate: {self.__learning_rate}")
         # extract metadata from the data to train the NN
-        if self.__graph:
-            print("Before apply __extract_metadata function, __n_records: ",
-                  self.__n_records)
-            print(
-                "Before apply __extract_metadata function, __n_features: ", self.__n_features)
-            print("Before apply __extract_metadata function, __n_classes: ",
-                  self.__n_classes)
         self.__extract_metadata(features, targets)
-        if self.__graph:
-            print("After apply __extract_metadata function, __n_records: ",
-                  self.__n_records)
-            print("After apply __extract_metadata function, __n_features: ",
-                  self.__n_features)
-            print("After apply __extract_metadata function, __n_classes: ",
-                  self.__n_classes)
+        if self.__bias:
+            # Add column of one to data as constant value to use the bias in weights
+            features = np.c_[features, np.ones(self.__n_records)]
+            self.__n_features += 1
         #########################################################################################
         # Add the weights for the NN
-        if self.__graph:
-            print("Before apply __addWeights function, __weights: ", self.__weights)
         self.__addWeights()
         if self.__graph:
             print("After apply __addWeights function, __weights: ", self.__weights)
+        #########################################################################################
+        # Iterate over the epochs
         for e in range(self.__epochs):
+            #########################################################################################
+            # Iterate over each data point
             for (x, y) in zip(features, targets):
-                if self.__graph:
-                    print("x: ", x)
-                    print("y: ", y)
                 #########################################################################################
-                # Feed forward process
+                #########################################################################################
+                ################ Feed forward process ################################################
+                #########################################################################################
+                #########################################################################################
+
                 output = self.__feedForward(x)
                 if self.__graph:
                     print("After apply __feedForward function, output: ", output)
@@ -220,67 +223,124 @@ class NeuralNetwork:
                         print(
                             f"After apply __feedForward function, in: __out_layers[{i}]", self.__out_layers[i])
                 #########################################################################################
-                # Back propagation process
+                #########################################################################################
+                ################ Backpropagation process ################################################
+                #########################################################################################
                 #########################################################################################
                 # Caluclate the error_terms
                 self.__calculate_error_terms(y, output)
                 if self.__graph:
                     print(
-                        "After apply __calculate_error_terms function, __error_terms: ", self.__error_terms)
+                        f"After apply __calculate_error_terms function, __error_terms: {self.__error_terms}")
                     for i in range(len(self.__error_terms)):
                         print(f"__error_terms[{i}].shape",
                               self.__error_terms[i].shape)
                 #########################################################################################
                 # Update weights
                 self.__updateWeights(x)
-
+            #########################################################################################
+            # Show resuluts over each tenths epochs
             if not self.__graph and (e/10) % 10 == 0:
+                #########################################################################################
+                #########################################################################################
+                ################ Caluclate Loss function ################################################
+                #########################################################################################
+                #########################################################################################
+                # Descide what loss function type you will use
                 loss_function = None
                 if self.__type_loss_function == 'CE':  # Cross Entopy
                     loss_function = self.__cross_entropy
                 elif self.__type_loss_function == 'SE':  # Square Error
                     loss_function = self.__square_error
-
+                #########################################################################################
+                # Feed forward process to get Loss function
                 outputs = self.__feedForward(features)
-                if self.__graph:
-                    print("To get loss, outputs: ", outputs)
-
-                # targets = np.array(targets)[:, None]
                 targets = targets.reshape(outputs.shape)
-                if self.__graph:
-                    print(f"targets: {targets}")
-                    print(f"targets - outputs: {(targets - outputs)**2}")
                 loss = np.mean(self.__lossError(
                     loss_function, targets, outputs))
-
+                #########################################################################################
+                # Display the results
                 print(f"Train loss: {loss}", end='    ')
                 if last_loss and loss > last_loss:
                     print("Loss increasing!")
                 else:
                     print()
+                #########################################################################################
+                # Calculate accuracy of trainning data
                 predictions = outputs >= 0.5
-
                 accuracy = np.mean(predictions == targets)
+                #########################################################################################
+                # Display the results
                 print(f"Train accuracy: {accuracy :0.3f}")
+                print()
+                #########################################################################################
+                # Update the flag
                 last_loss = loss
-        pass
 
     def test(self, features_test, targets_test):
-        print()
+        #########################################################################################
+        # Needs update to get better performance
+        if self.__bias:
+            # Add column of one to data as constant value to use the bias in weights
+            features_test = np.c_[features_test, np.ones(self.__n_records)]
+        #########################################################################################
+        # Feed forward process to get accuracy results
         outputs = self.__feedForward(features_test)
         targets_test = targets_test.reshape(outputs.shape)
-        if self.__graph:
-            print(f"outputs test:{outputs}")
-            print(f"targets_test:{targets_test}")
-        print(f"test outputs: {outputs}")
-
         predictions = outputs >= 0.5
         print(predictions)
         accuracy = np.mean(predictions == targets_test)
+        #########################################################################################
+        # Display the results
         print(f"Test accuracy: {accuracy :0.3f}")
 
-        print(f"test self.__weights: {self.__weights}")
-    def plot_boundary(self):
+    def plot_boundary(self, data, x1_start=-1.5, x1_stop=1.5, x1_n_values=100,
+                      x2_start=-1.5, x2_stop=1.5, x2_n_values=100):
+
+        condition1 = self.__n_features == 2 and self.__bias == False
+        condition2 = self.__n_features == 3 and self.__bias == True
+        condition = condition1 or condition2
+        if not condition:
+            print(f"__n_features should be 2d to visualize")
+            print(f"self.__n_features = {self.__n_features}")
+            print(f"self.__bias = {self.__bias}")
+            return
+
+        fig = plt.figure(figsize=(6, 5))
+
+        left, bottom, width, height = 0.1, 0.1, 0.8, 0.8
+        ax = fig.add_axes([left, bottom, width, height])
+
+        x1_vals = np.linspace(x1_start, x1_stop, x1_n_values)
+        x2_vals = np.linspace(x2_start, x2_stop, x2_n_values)
+        X1, X2 = np.meshgrid(x1_vals, x2_vals)
+
+        w = self.__weights[0]
+        print(w)
+        Z = w[0] * X1 + w[1] * X2
+        if self.__bias:
+            Z += w[2]
+        contour = plt.contour(X1, X2, Z, levels=[0])
+        ax.set_title('Boundary line')
+        ax.set_xlabel('X1')
+        ax.set_ylabel('X2')
+        plt.xlim(-1.2, 1.2)
+        plt.ylim(-1.2, 1.2)
+        # add points
+        self.__plot_points(data, "Descition boundary")
+
+        plt.show()
+
+    def __plot_points(self, data, title):
+        admitted = data[data['y'] == 1]
+        rejected = data[data['y'] == 0]
+        plt.scatter(admitted['x1'], admitted['x2'],
+                    s=25, color='cyan', edgecolor='k')
+        plt.scatter(rejected['x1'], rejected['x2'],
+                    s=25, color='red', edgecolor='k')
+        plt.xlabel('x1')
+        plt.ylabel('x2')
+        plt.title(title)
         pass
 
 

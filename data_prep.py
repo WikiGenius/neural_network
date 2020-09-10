@@ -1,9 +1,10 @@
 import numpy as np
 import pandas as pd
 
-data = pd.read_csv('and.csv')
+data = pd.read_csv('or.csv')
 
 # process data
+# data['bias'] = 1
 for field in ['x1', 'x2']:
     mean, std = data[field].mean(), data[field].std()
     data[field] = (data[field] - mean)/std
@@ -11,4 +12,3 @@ for field in ['x1', 'x2']:
 features, targets = data.drop('y', axis=1), data['y']
 
 features, targets = np.array(features), np.array(targets)
-

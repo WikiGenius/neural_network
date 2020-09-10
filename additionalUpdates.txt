@@ -1,0 +1,3 @@
+1_Add bias into __in_layers (hidden layers) take care of weights and error terms
+2_plot nonlinear boundary
+3_Need other activation function like softmax, Relu
