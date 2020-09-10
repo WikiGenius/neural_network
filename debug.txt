@@ -1,0 +1,35 @@
+Train loss: 0.7891057967970596    
+Train accuracy: 0.250
+Train loss: 0.006012483778249813    
+Train accuracy: 1.000
+Train loss: 0.0030274986487002203    
+Train accuracy: 1.000
+Train loss: 0.002028029772298526    
+Train accuracy: 1.000
+Train loss: 0.0015261004639002093    
+Train accuracy: 1.000
+Train loss: 0.0012238957823885654    
+Train accuracy: 1.000
+Train loss: 0.0010218669876385182    
+Train accuracy: 1.000
+Train loss: 0.0008772337939610604    
+Train accuracy: 1.000
+Train loss: 0.0007685539254320476    
+Train accuracy: 1.000
+Train loss: 0.000683889479062782    
+Train accuracy: 1.000
+
+test outputs: [[5.36927761e-10]
+ [7.42222752e-04]
+ [7.17019622e-04]
+ [9.98993580e-01]]
+[[False]
+ [False]
+ [False]
+ [ True]]
+Test accuracy: 1.000
+test self.__weights: [array([[-2.70303884, -2.74808565,  1.92601701,  2.8539239 ],
+       [-3.09068052, -2.78541917,  1.92882334,  1.65734434]]), array([[-11.38771326],
+       [-10.30340674],
+       [  2.98534033],
+       [  4.26097094]])]

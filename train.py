@@ -9,9 +9,9 @@ def main():
 
 
 class NeuralNetwork:
-    def __init__(self, activate_hidden_layers=True, hidden_layers=(2,),
-                 epochs=1000, learning_rate=0.1,
-                 type_loss_function="CE", type_activation_hidden="sigmoid", graph=True):
+    def __init__(self, activate_hidden_layers=True, hidden_layers=(4,),
+                 epochs=1000, learning_rate=2,
+                 type_loss_function="CE", type_activation_hidden="sigmoid", graph=False, random_seed=42):
         """
         [describe]: initialize hyper parameters
         activate_hidden_layers: boolean, The architecture of NN has hidden layers or not
@@ -22,7 +22,7 @@ class NeuralNetwork:
         and used in updating the weights
         graph: as debug mode
         """
-        np.random.seed(42)
+        np.random.seed(random_seed)
         self.__activate_hidden_layers = activate_hidden_layers
         self.__hidden_layers = hidden_layers
         self.__epochs = epochs
@@ -33,21 +33,17 @@ class NeuralNetwork:
         self.__n_records = None
         self.__n_features = None
         self.__n_classes = None
-        self.__features = None
-        self.__targets = None
         self.__weights = []
         self.__in_layers = []
         self.__out_layers = []
         self.__error_terms = []
 
     def __extract_metadata(self, features, targets):
-        self.__features = features
-        self.__targets = targets
-        self.__n_records, self.__n_features = self.__features.shape
-        if len(self.__targets.shape) == 1:
+        self.__n_records, self.__n_features = features.shape
+        if len(targets.shape) == 1:
             self.__n_classes = 1
         else:
-            _, self.__n_classes = self.__targets.shape
+            _, self.__n_classes = targets.shape
 
     def __addWeights(self):
         # intialize number of the hidden layers if there is no any hidden layer
@@ -115,9 +111,13 @@ class NeuralNetwork:
         # It depends on the type of loss function and the activation function
         # I used activation function sigmoid here assuming, I have binary class, for simplicity
         # I will update it to be more general
-        y = np.array(y).reshape(-1, self.__n_classes)
+        y = np.array(y).reshape(output.shape)
         error = y - output
-
+        if error.ndim == 1:
+            error = error.reshape(1, -1)
+        if self.__graph:
+            print("error CE: ", error)
+            print("error SE: ", error * output * (1 - output))
         if self.__type_loss_function == 'CE':  # Cross Entopy
             return error
         elif self.__type_loss_function == 'SE':  # Square Error
@@ -125,6 +125,8 @@ class NeuralNetwork:
 
     def __calculate_error_terms(self, y, output):
         n_weights = len(self.__weights)
+        if self.__graph:
+            print("n_weights: ", n_weights)
         self.__error_terms = [None for _ in range(n_weights)]
         # Calculate the first error term related to the output
         self.__error_terms[-1] = self.__calculate_out_error_term(y, output)
@@ -147,53 +149,116 @@ class NeuralNetwork:
             else:
                 in_signal = self.__out_layers[i-1]
             error_term = self.__error_terms[i]
+            if self.__graph:
+                print(f"in_signal = {in_signal}")
+                print(f"error_term = {error_term}")
 
-            # self.__weights[i] += self.__learning_rate * \
-            #     np.matmul(in_signal.T, error_term)
-            self.__weights[i] += self.__learning_rate * \
-                np.matmul(in_signal[:, None], error_term)
+            gradient = None
+            if in_signal.ndim == 2:
+                gradient = np.matmul(in_signal.T, error_term)
+            elif in_signal.ndim == 1:
+                if self.__graph:
+                    print(f"in_signal[:, None]: {in_signal[:, None]}")
+                gradient = np.matmul(in_signal[:, None], error_term)
+
+            del_w = self.__learning_rate * gradient
+            if self.__graph:
+                print("Before Update:  ")
+                print(f"self.__weights[{i}] = {self.__weights[i]}")
+            self.__weights[i] += del_w
+            if self.__graph:
+                print("After Update:  ")
+                print(f"gradient = {gradient}")
+                print(f"del_w = {self.__learning_rate * gradient}")
+                print(f"self.__weights[{i}] = {self.__weights[i]}")
+
         pass
 
     def train(self, features, targets):
         last_loss = None
         #########################################################################################
+        if self.__graph:
+            print(f"features: {features}")
+            print(f"targets: {targets}")
+            print(f"learn_rate: {self.__learning_rate}")
         # extract metadata from the data to train the NN
+        if self.__graph:
+            print("Before apply __extract_metadata function, __n_records: ",
+                  self.__n_records)
+            print(
+                "Before apply __extract_metadata function, __n_features: ", self.__n_features)
+            print("Before apply __extract_metadata function, __n_classes: ",
+                  self.__n_classes)
         self.__extract_metadata(features, targets)
+        if self.__graph:
+            print("After apply __extract_metadata function, __n_records: ",
+                  self.__n_records)
+            print("After apply __extract_metadata function, __n_features: ",
+                  self.__n_features)
+            print("After apply __extract_metadata function, __n_classes: ",
+                  self.__n_classes)
         #########################################################################################
         # Add the weights for the NN
+        if self.__graph:
+            print("Before apply __addWeights function, __weights: ", self.__weights)
         self.__addWeights()
+        if self.__graph:
+            print("After apply __addWeights function, __weights: ", self.__weights)
         for e in range(self.__epochs):
             for (x, y) in zip(features, targets):
-
+                if self.__graph:
+                    print("x: ", x)
+                    print("y: ", y)
                 #########################################################################################
                 # Feed forward process
                 output = self.__feedForward(x)
+                if self.__graph:
+                    print("After apply __feedForward function, output: ", output)
+                    for i in range(len(self.__in_layers)):
+                        print(
+                            f"After apply __feedForward function, in: __in_layers[{i}]", self.__in_layers[i])
+                        print(
+                            f"After apply __feedForward function, in: __out_layers[{i}]", self.__out_layers[i])
                 #########################################################################################
                 # Back propagation process
                 #########################################################################################
                 # Caluclate the error_terms
                 self.__calculate_error_terms(y, output)
+                if self.__graph:
+                    print(
+                        "After apply __calculate_error_terms function, __error_terms: ", self.__error_terms)
+                    for i in range(len(self.__error_terms)):
+                        print(f"__error_terms[{i}].shape",
+                              self.__error_terms[i].shape)
                 #########################################################################################
                 # Update weights
                 self.__updateWeights(x)
 
-            if (e/10) % 10 == 0:
+            if not self.__graph and (e/10) % 10 == 0:
                 loss_function = None
                 if self.__type_loss_function == 'CE':  # Cross Entopy
                     loss_function = self.__cross_entropy
                 elif self.__type_loss_function == 'SE':  # Square Error
                     loss_function = self.__square_error
 
-                output = self.__feedForward(features)
-                targets = np.array(targets)[:, None]
+                outputs = self.__feedForward(features)
+                if self.__graph:
+                    print("To get loss, outputs: ", outputs)
+
+                # targets = np.array(targets)[:, None]
+                targets = targets.reshape(outputs.shape)
+                if self.__graph:
+                    print(f"targets: {targets}")
+                    print(f"targets - outputs: {(targets - outputs)**2}")
                 loss = np.mean(self.__lossError(
-                    loss_function, targets, output))
+                    loss_function, targets, outputs))
+
                 print(f"Train loss: {loss}", end='    ')
                 if last_loss and loss > last_loss:
                     print("Loss increasing!")
                 else:
                     print()
-                predictions = output >= 0.5
+                predictions = outputs >= 0.5
 
                 accuracy = np.mean(predictions == targets)
                 print(f"Train accuracy: {accuracy :0.3f}")
@@ -202,11 +267,19 @@ class NeuralNetwork:
 
     def test(self, features_test, targets_test):
         print()
-        output = self.__feedForward(features_test)
-        predictions = output >= 0.5
+        outputs = self.__feedForward(features_test)
+        targets_test = targets_test.reshape(outputs.shape)
+        if self.__graph:
+            print(f"outputs test:{outputs}")
+            print(f"targets_test:{targets_test}")
+        print(f"test outputs: {outputs}")
+
+        predictions = outputs >= 0.5
+        print(predictions)
         accuracy = np.mean(predictions == targets_test)
         print(f"Test accuracy: {accuracy :0.3f}")
 
+        print(f"test self.__weights: {self.__weights}")
     def plot_boundary(self):
         pass
 
