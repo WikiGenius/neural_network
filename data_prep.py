@@ -14,10 +14,9 @@ if split_data:
     # np.random.seed(42)
     sample = np.random.choice(
         data.index, size=int(len(data)*0.9), replace=False)
-    data, test_data = data.iloc[sample], data.drop(sample)
+    train_data, test_data = data.loc[sample], data.drop(sample)
 
     # Split into features and targets
-    features, targets = data.drop('y', axis=1), data['y']
     features_test, targets_test = test_data.drop(
         'y', axis=1), test_data['y']
 else:

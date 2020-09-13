@@ -1,11 +1,17 @@
 1_Add bias into __in_layers (hidden layers) take care of weights and error terms --> done
 2_plot nonlinear boundary --> Done
+3_ tune hyper parameters epochs by adding validation data -> done
 
-Solve this bug
+_ Orgnize train function
+
+4_ Add regulization term for the error function
+5_Fix this bug
 train.py:132: RuntimeWarning: divide by zero encountered in log
   return -y * np.log(output) - (1-y)*np.log(1-output)
 train.py:132: RuntimeWarning: invalid value encountered in multiply
   return -y * np.log(output) - (1-y)*np.log(1-output)
-  
-3_Need other activation function like softmax, Relu
-4_Add JSON file collects all the atributes in one place
+6_ Fix this bug
+train.py:407: UserWarning: No contour levels were found within the data range.
+  plt.contour(X1, X2, Z, levels=[0])
+7_Need other activation function like softmax, Relu
+8_Add JSON file collects all the atributes in one place

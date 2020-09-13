@@ -1,5 +1,5 @@
 import numpy as np
-from data_prep import data, features, targets, features_test, targets_test
+from data_prep import data, train_data, features_test, targets_test
 from sys import exit
 
 visualize_mode = True
@@ -9,7 +9,7 @@ if visualize_mode:
 
 def main():
     nn = NeuralNetwork()
-    nn.train(features, targets)
+    nn.train(train_data)
     nn.test(features_test, targets_test)
     nn.plot_boundary(features_test, targets_test)
     exit(0)
@@ -17,10 +17,10 @@ def main():
 
 class NeuralNetwork:
 
-    def __init__(self, activate_hidden_layers=True, hidden_layers=(30,30),
-                 epochs=2000, learning_rate=0.5, bias=True,
-                 type_loss_function="CE", type_activation_hidden="sigmoid",
-                 debug=True, graph=False, random_seed=42):
+    def __init__(self, activate_hidden_layers=False, hidden_layers=(2,),
+                 epochs=1000, learning_rate=0.5, bias=True, validation=True,
+                 jumps=10, type_loss_function="CE", type_activation_hidden="sigmoid",
+                 debug=False, graph=True, random_seed=42):
         """
         [describe]: initialize hyper parameters
         activate_hidden_layers: boolean, The architecture of NN has hidden layers or not
@@ -28,9 +28,12 @@ class NeuralNetwork:
         epochs: number of iterations for NN to learn
         learning_rate: scaling the gradient descent to improve the stability of learning
         bias: Add bias (shift the boundary descition) or Not
+        validation: if activated the algorithm early stopping 
+        will run to tune the epochs and prevent the trainning from overfitting
         type_loss_function: the type of loss function that used as measure of the error
         and used in updating the weights
         graph: as debug mode
+
         """
         if debug:
             np.random.seed(random_seed)
@@ -39,6 +42,8 @@ class NeuralNetwork:
         self.__epochs = epochs
         self.__learning_rate = learning_rate
         self.__bias = bias  # add bias or not
+        self.__validation = validation  # to tune the epochs
+        self.__jumps = jumps  # jumps on epochs as sensetive tunning for epochs
         self.__type_loss_function = type_loss_function  # 'CE' / 'SE'
         self.__type_activation_hidden = type_activation_hidden  # "sigmoid"
         self.__graph = graph
@@ -192,26 +197,55 @@ class NeuralNetwork:
 
         pass
 
-    def train(self, features, targets):
+    def train(self, train_data):
         #########################################################################################
         # Initialize flag to warn you if the error is increasing
-        last_loss = None
+        train_last_loss = None
+        if self.__validation:
+            validation_last_loss = None
+        #########################################################################################
+        #########################################################################################
+        ################ preperation for data ################################################
+        #########################################################################################
+        #########################################################################################
+        #########################################################################################
+        # split training data into training and validation sets to tune the hyper parameter epochs
+        if self.__validation:
+            sample = np.random.choice(train_data.index, size=int(
+                len(train_data)*0.8), replace=False)
+            train_data, validation_data = train_data.loc[sample], train_data.drop(
+                sample)
+            # Split into features and targets for validation data
+            features_validation, targets_validation = validation_data.drop(
+                'y', axis=1), validation_data['y']
+            # Conver from pd.Datafram into numpy
+            features_validation, targets_validation = np.array(
+                features_validation), np.array(targets_validation)
+        # Split into features and targets for train data
+        features_train, targets_train = train_data.drop(
+            'y', axis=1), train_data['y']
         #########################################################################################
         # Conver from pd.Datafram into numpy
-        features, targets = np.array(features), np.array(targets)
+        features_train, targets_train = np.array(
+            features_train), np.array(targets_train)
         #########################################################################################
         # extract metadata from the data to train the NN
-        self.__extract_metadata(features, targets)
+        self.__extract_metadata(features_train, targets_train)
         # #########################################################################################
         # Add the weights for the NN
         self.__addWeights()
-
+        #########################################################################################
+        # initialize train_errors for visualization
+        if self.__graph:
+            train_errors = []
+            if self.__validation:
+                validation_errors = []
         #########################################################################################
         # Iterate over the epochs
         for e in range(self.__epochs):
             #########################################################################################
             # Iterate over each data point
-            for (x, y) in zip(features, targets):
+            for (x, y) in zip(features_train, targets_train):
                 #########################################################################################
                 #########################################################################################
                 ################ Feed forward process ################################################
@@ -231,46 +265,93 @@ class NeuralNetwork:
                 # Update weights
                 self.__updateWeights(x)
             #########################################################################################
+            #########################################################################################
+            ################ Caluclate Loss function ################################################
+            #########################################################################################
+            #########################################################################################
+            # Descide what loss function type you will use
+            loss_function = None
+            if self.__type_loss_function == 'CE':  # Cross Entopy
+                loss_function = self.__cross_entropy
+            elif self.__type_loss_function == 'SE':  # Square Error
+                loss_function = self.__square_error
+            #########################################################################################
+            # Feed forward process to get Loss function
+            outputs_train = self.__feedForward(features_train)
+            targets_train = targets_train.reshape(outputs_train.shape)
+            loss_train = np.mean(self.__lossError(
+                loss_function, targets_train, outputs_train))
+            if self.__validation:
+                outputs_validation = self.__feedForward(features_validation)
+                targets_validation = targets_validation.reshape(
+                    outputs_validation.shape)
+                loss_validation = np.mean(self.__lossError(
+                    loss_function, targets_validation, outputs_validation))
+            if self.__graph:
+                train_errors.append(loss_train)
+                if self.__validation:
+                    validation_errors.append(loss_validation)
+            #########################################################################################
             # Show resuluts over each tenths epochs
-            if e % (self.__epochs / 10) == 0:
+            if e % (self.__jumps) == 0:
                 print("\n========== Epoch", e, "==========")
-                #########################################################################################
-                #########################################################################################
-                ################ Caluclate Loss function ################################################
-                #########################################################################################
-                #########################################################################################
-                # Descide what loss function type you will use
-                loss_function = None
-                if self.__type_loss_function == 'CE':  # Cross Entopy
-                    loss_function = self.__cross_entropy
-                elif self.__type_loss_function == 'SE':  # Square Error
-                    loss_function = self.__square_error
-                #########################################################################################
-                # Feed forward process to get Loss function
-                outputs = self.__feedForward(features)
-                targets = targets.reshape(outputs.shape)
-                loss = np.mean(self.__lossError(
-                    loss_function, targets, outputs))
+
                 #########################################################################################
                 # Display the results
-                print(f"Train loss: {loss}", end='    ')
-                if last_loss and loss > last_loss:
-                    print("Loss increasing!")
+                print(f"Train loss: {loss_train}", end='    ')
+                if train_last_loss and loss_train > train_last_loss:
+                    print("loss_train increasing!")
                 else:
                     print()
+
+                if self.__validation:
+                    print(f"Validation loss: {loss_validation}", end='    ')
+                    if validation_last_loss and loss_validation > validation_last_loss:
+                        print("loss_validation increasing!")
+                        break
+                    else:
+                        print()
                 #########################################################################################
-                # Calculate accuracy of trainning data
-                predictions = outputs >= 0.5
-                accuracy = np.mean(predictions == targets)
+                # Calculate accuracy of data
+                # train
+                train_predictions = outputs_train >= 0.5
+                train_accuracy = np.mean(train_predictions == targets_train)
+                # validation
+
+                if self.__validation:
+                    validation_predictions = outputs_validation >= 0.5
+                    validation_accuracy = np.mean(
+                        validation_predictions == targets_validation)
                 #########################################################################################
                 # Display the results
-                print(f"Train accuracy: {accuracy :0.3f}")
+                print(f"Train accuracy: {train_accuracy :0.3f}")
+                if self.__validation:
+                    print(f"Validation accuracy: {validation_accuracy :0.3f}")
                 print()
-                if accuracy == 1:
-                    return
+
                 #########################################################################################
                 # Update the flag
-                last_loss = loss
+                if self.__validation:
+                    if validation_accuracy == 1:
+                        break
+                    validation_last_loss = loss_validation
+                else:
+                    if train_accuracy == 1:
+                        break
+                train_last_loss = loss_train
+        # plot the errors
+        if self.__graph:
+            plt.plot(train_errors, '-b', label='Train Error')
+            if self.__validation:
+                plt.plot(validation_errors, '--r',
+                         label='Validation Error')
+            plt.xlabel('Epochs')
+            plt.ylabel('Error')
+            if self.__validation:
+                plt.title('Train vs validation error')
+            else:
+                plt.title('Train error')
+            plt.legend()
 
     def test(self, features_test, targets_test):
         #########################################################################################
@@ -282,8 +363,6 @@ class NeuralNetwork:
         outputs = self.__feedForward(features_test)
         targets_test = targets_test.reshape(outputs.shape)
         predictions = outputs >= 0.5
-        print("Predictions:")
-        print(predictions)
         accuracy = np.mean(predictions == targets_test)
         #########################################################################################
         # Display the results
@@ -308,11 +387,11 @@ class NeuralNetwork:
         scale_factor = 0.25
         x1_start, x1_stop = features['x1'].min(), features['x1'].max()
         x1_start += scale_factor * x1_start
-        x1_stop  += scale_factor * x1_stop
+        x1_stop += scale_factor * x1_stop
 
         x2_start, x2_stop = features['x2'].min(), features['x2'].max()
         x2_start += scale_factor * x2_start
-        x2_stop  += scale_factor * x2_stop
+        x2_stop += scale_factor * x2_stop
 
         x1_vals = np.linspace(x1_start, x1_stop, x1_n_values)
         x2_vals = np.linspace(x2_start, x2_stop, x2_n_values)
