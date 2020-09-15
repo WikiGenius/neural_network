@@ -1,8 +1,13 @@
 1_Add bias into __in_layers (hidden layers) take care of weights and error terms --> done
 2_plot nonlinear boundary --> Done
 3_ tune hyper parameters epochs by adding validation data -> done
-
-_ Orgnize train function
+# Test early stopping if accuracy =1 with error > done
+_ Orgnize train function > done
+    _data prepration and validation data
+    _display results
+    _calculate loss function  
+          -> display results
+          -> control validation error
 
 4_ Add regulization term for the error function
 5_Fix this bug
