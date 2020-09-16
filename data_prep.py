@@ -35,7 +35,7 @@ def prepare(csv_file, fields, label, split=True, validation_split=True, dummy_va
         train_data, test_data = split_data(data, ratio=0.9)
         # split training data into training and validation sets to tune the hyper parameter epochs
         if validation_split:
-            train_data, validation_data = split_data(train_data, ratio=0.8)
+            train_data, validation_data = split_data(train_data, ratio=0.9)
 
         # Split into features and targets for train data
         features_train, targets_train = get_features_targets(train_data, label)

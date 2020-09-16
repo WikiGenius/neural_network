@@ -8,14 +8,11 @@ _ Orgnize train function > done
     _calculate loss function  
           -> display results
           -> control validation error
-
 6_ Fix this bug > the reason is the margin values is small and zero not in the range
 train.py:407: UserWarning: No contour levels were found within the data range.
   plt.contour(X1, X2, Z, levels=[0])
-  
 4_ Add regulization term for the error function -> done
-
-5_Fix this bug
+5_Fix this bug done
 train.py:132: RuntimeWarning: divide by zero encountered in log
   return -y * np.log(output) - (1-y)*np.log(1-output)
 train.py:132: RuntimeWarning: invalid value encountered in multiply

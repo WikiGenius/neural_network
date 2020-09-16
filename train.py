@@ -25,8 +25,8 @@ def main():
 class NeuralNetwork:
 
     def __init__(self, activate_hidden_layers=True, hidden_layers=(2,),
-                 epochs=1000, learning_rate=0.1, activate_early_stopping=True,
-                 activate_regularization=True, regularization_type='L2', reg_factor=0.1,
+                 epochs=1000, learning_rate=0.15, activate_early_stopping=True,
+                 activate_regularization=True, regularization_type='L2', reg_factor=0.17,
                  bias=True, jumps=1, type_loss_function="CE",
                  type_activation_hidden="sigmoid",
                  debug=True, graph=True, random_seed=42, display_weights=False):
@@ -187,7 +187,7 @@ class NeuralNetwork:
                 if self.__regularization_type == 'L1':
                     term = np.abs(weight)
                 elif self.__regularization_type == 'L2':
-                    term = np.power(weight, 2)
+                    term = np.power(weight, 2)/2
 
                 termsSum += np.sum(term)
             reg_term = self.__reg_factor * termsSum
@@ -202,10 +202,11 @@ class NeuralNetwork:
             return
 
     def __cross_entropy(self, y, output):
+        epsilon = 10**-10
         if self.__n_classes == 1:
-            return -y * np.log(output) - (1-y)*np.log(1-output)
+            return -y * np.log(output + epsilon) - (1-y)*np.log(1-output + epsilon)
         else:
-            return - np.dot(y, np.log(output))
+            return - np.dot(y, np.log(output + epsilon))
 
     def __calculate_out_error_term(self, y, output):
         # It depends on the type of loss function and the activation function
@@ -266,8 +267,7 @@ class NeuralNetwork:
 
             if self.__activate_regularization:
                 if self.__regularization_type == 'L2':
-                    derivative_reg_term = 2 * \
-                        self.__reg_factor * self.__weights[i]
+                    derivative_reg_term = self.__reg_factor * self.__weights[i]
                     # update the gradient because of the regularization
                 elif self.__regularization_type == 'L1':
                     derivative_reg_term = np.array(
@@ -313,9 +313,9 @@ class NeuralNetwork:
             And becomes good fit
             It tunes the epochs
         """
-        if accuracy_validation == 1:
-            print("accuracy_validation = 1")
-            return True
+        # if accuracy_validation == 1:
+        #     print("accuracy_validation = 1")
+        #     return True
 
         if epoch_step % (self.__jumps) == 0:
             if self.__last_loss_validation and loss_validation > self.__last_loss_validation:
