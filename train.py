@@ -26,10 +26,10 @@ class NeuralNetwork:
 
     def __init__(self, activate_hidden_layers=True, hidden_layers=(2,),
                  epochs=1000, learning_rate=0.1, activate_early_stopping=True,
-                 activate_regularization=True, regularization_type='L2', reg_factor=0.01,
+                 activate_regularization=True, regularization_type='L2', reg_factor=0.1,
                  bias=True, jumps=1, type_loss_function="CE",
                  type_activation_hidden="sigmoid",
-                 debug=True, graph=True, random_seed=42):
+                 debug=True, graph=True, random_seed=42, display_weights=False):
         """
         [describe]: initialize hyper parameters
 
@@ -85,7 +85,7 @@ class NeuralNetwork:
         self.__type_activation_hidden = type_activation_hidden  # "sigmoid"
         self.__graph = graph
         self.__debug = debug
-
+        self.__display_weights = display_weights
         self.__n_records = None
         self.__n_features = None
         self.__n_classes = None
@@ -263,6 +263,20 @@ class NeuralNetwork:
                 gradient = np.matmul(in_signal.T, error_term)
             elif in_signal.ndim == 1:
                 gradient = np.matmul(in_signal[:, None], error_term)
+
+            if self.__activate_regularization:
+                if self.__regularization_type == 'L2':
+                    derivative_reg_term = 2 * \
+                        self.__reg_factor * self.__weights[i]
+                    # update the gradient because of the regularization
+                elif self.__regularization_type == 'L1':
+                    derivative_reg_term = np.array(
+                        np.zeros(shape=self.__weights[i].shape))
+                    derivative_reg_term[self.__weights[i] > 0] = 1
+                    derivative_reg_term[self.__weights[i] < 0] = -1
+                    derivative_reg_term *= self.__reg_factor
+                    # update the gradient because of the regularization
+                gradient += derivative_reg_term
             del_w = self.__learning_rate * gradient
             self.__weights[i] += del_w
 
@@ -369,6 +383,11 @@ class NeuralNetwork:
             # Update the flag
             self.__last_loss_validation = loss_validation
             self.__last_loss_train = loss_train
+        if self.__display_weights:
+            for i, weight in enumerate(self.__weights):
+                print(f"\n==========weight{i+1}==========")
+                print(weight)
+
         # plot the errors
         if self.__graph:
             self.__plot_errors(train_errors, validation_errors)
@@ -432,12 +451,6 @@ class NeuralNetwork:
 
         # add points
         self.__plot_points(features, targets, title + " Descition boundary")
-        # plt.xlim(x1_start + scale_factor * x1_start,
-        #          x1_stop + scale_factor * x1_stop)
-        # plt.ylim(x2_start + scale_factor * x2_start,
-        #          x2_stop + scale_factor * x2_stop)
-        # plt.ylim(x2_start, x2_stop)
-        # plt.show()
 
     def __plot_points(self, features, targets, title):
         admitted = features[targets == 1]

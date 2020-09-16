@@ -3,11 +3,10 @@ import pandas as pd
 
 
 def main():
-    np.random.seed(42)
     # get prepared data
     train_validation_test = prepare(
         csv_file='data.csv', fields=['x1', 'x2'], label='y',
-        split=True, validation_split=True, dummy_var=None)
+        split=True, validation_split=True, dummy_var=None, debug=True)
     return train_validation_test
 
 
@@ -25,7 +24,10 @@ def process(csv_file, fields, dummy_var=None):
     return data
 
 
-def prepare(csv_file, fields, label, split=True, validation_split=True, dummy_var=None):
+def prepare(csv_file, fields, label, split=True, validation_split=True, dummy_var=None, debug=True, random_seed=42):
+    if debug:
+        np.random.seed(random_seed)
+
     data = process(csv_file, fields, dummy_var)
 
     if split:

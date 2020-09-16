@@ -22,11 +22,16 @@ from scipy.linalg import lu
 # lin_indep_columns = [np.flatnonzero(U[i, :])[0] for i in range(U.shape[0])]
 # print(f"lin_indep_columns:\n{lin_indep_columns}")
 
-x = np.array(np.arange(-3, 6).reshape(3, 3))
+x = np.array(np.random.randn(3,3))
+x = np.array(np.arange(-3,6).reshape(3,3))
+
 print(x)
-y = np.power(x, 2)
-print(y)
-print(np.sum(y))
-z = np.abs(x)
-print(z)
-print(np.sum(z))
+print(0 in x)
+print(np.round(x,decimals = 2))
+
+# y = np.power(x, 2)
+# print(y)
+# print(np.sum(y))
+# z = np.abs(x)
+# print(z)
+# print(np.sum(z))
