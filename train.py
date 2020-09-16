@@ -2,9 +2,7 @@ import numpy as np
 from data_prep import features_train, targets_train, features_validation, targets_validation, features_test, targets_test
 from sys import exit
 
-visualize_mode = True
-if visualize_mode:
-    import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 
 
 def main():
@@ -27,31 +25,61 @@ def main():
 class NeuralNetwork:
 
     def __init__(self, activate_hidden_layers=True, hidden_layers=(2,),
-                 epochs=1000, learning_rate=0.5, bias=True, validation=True,
-                 jumps=10, type_loss_function="CE", type_activation_hidden="sigmoid",
-                 debug=False, graph=True, random_seed=42):
+                 epochs=1000, learning_rate=0.1, activate_early_stopping=True,
+                 activate_regularization=True, regularization_type='L2', reg_factor=0.01,
+                 bias=True, jumps=1, type_loss_function="CE",
+                 type_activation_hidden="sigmoid",
+                 debug=True, graph=True, random_seed=42):
         """
         [describe]: initialize hyper parameters
-        activate_hidden_layers: boolean, The architecture of NN has hidden layers or not
-        hidden_layers: tuple of nurons in each hidden layer in order
-        epochs: number of iterations for NN to learn
-        learning_rate: scaling the gradient descent to improve the stability of learning
-        bias: Add bias (shift the boundary descition) or Not
-        validation: if activated the algorithm early stopping
-        will run to tune the epochs and prevent the trainning from overfitting
-        type_loss_function: the type of loss function that used as measure of the error
-        and used in updating the weights
-        graph: as debug mode
 
+        @param [activate_hidden_layers]: boolean, The architecture of NN has hidden layers or not
+
+        @param [hidden_layers]: tuple of nurons in each hidden layer in order
+
+        @param [epochs]: number of iterations for NN to learn
+
+        @param [learning_rate]: scaling the gradient descent to improve the stability of learning
+
+        @param [activate_early_stopping]: if activated the algorithm early stopping
+        will run to tune(stop) the epochs and prevent the trainning from overfitting
+
+        @param [activate_regularization]: To penalize high weights
+
+        @param [regularization_type]: Two types-> L1 / L2
+        L1: Feature selection
+        L2: Training the Model
+
+        @param [reg_factor]: How much you want to penalize large weights
+        if this factor is large you want to penalize so much and vice versa
+
+        @param [bias]: Add bias (shift the boundary descition) or Not
+
+        @param [jumps]: jumps on epochs as sensetive tunning for epochs
+
+        @param [type_loss_function]: the type of loss function that used as measure of the error
+        and used in updating the weights
+
+        @param [type_activation_hidden]: The activation function on the hidden layers
+
+        @param [debug]: debug or not
+
+        @param [graph]: To graph the graphs
+
+        @param [random_seed]: initalize random
         """
+
         if debug:
             np.random.seed(random_seed)
         self.__activate_hidden_layers = activate_hidden_layers
         self.__hidden_layers = hidden_layers
         self.__epochs = epochs
         self.__learning_rate = learning_rate
+        self.__activate_early_stopping = activate_early_stopping  # to tune the epochs
+        self.__activate_regularization = activate_regularization  # To penalize high weights
+        self.__regularization_type = regularization_type  # L1 / L2
+        self.__reg_factor = reg_factor
         self.__bias = bias  # add bias or not
-        self.__validation = validation  # to tune the epochs
         self.__jumps = jumps  # jumps on epochs as sensetive tunning for epochs
         self.__type_loss_function = type_loss_function  # 'CE' / 'SE'
         self.__type_activation_hidden = type_activation_hidden  # "sigmoid"
@@ -150,13 +178,34 @@ class NeuralNetwork:
         self.__updateWeights(x)
 
     def __lossError(self, loss_function, y, output):
-        return loss_function(y, output)
+        return loss_function(y, output) + self.__regularization_term()
+
+    def __regularization_term(self):
+        if self.__activate_regularization:
+            termsSum = 0
+            for weight in self.__weights:
+                if self.__regularization_type == 'L1':
+                    term = np.abs(weight)
+                elif self.__regularization_type == 'L2':
+                    term = np.power(weight, 2)
+
+                termsSum += np.sum(term)
+            reg_term = self.__reg_factor * termsSum
+            return reg_term
+        else:
+            return 0
 
     def __square_error(self, y, output):
-        return (y-output)**2
+        if self.__n_classes == 1:
+            return (y-output)**2
+        else:
+            return
 
     def __cross_entropy(self, y, output):
-        return -y * np.log(output) - (1-y)*np.log(1-output)
+        if self.__n_classes == 1:
+            return -y * np.log(output) - (1-y)*np.log(1-output)
+        else:
+            return - np.dot(y, np.log(output))
 
     def __calculate_out_error_term(self, y, output):
         # It depends on the type of loss function and the activation function
@@ -262,7 +311,6 @@ class NeuralNetwork:
 
     def train(self, features_train, targets_train,
               features_validation, targets_validation):
-
         #########################################################################################
         # Conver from pd.Datafram into numpy
         features_train, targets_train = np.array(
@@ -301,7 +349,7 @@ class NeuralNetwork:
             if self.__graph:
                 train_errors.append(loss_train)
                 validation_errors.append(loss_validation)
-            
+
             #########################################################################################
             # Show resuluts over each tenths epochs
             if e % (self.__jumps) == 0:
@@ -315,8 +363,9 @@ class NeuralNetwork:
                     self.__last_loss_validation, loss_validation, accuracy_validation, "Validation")
 
             #########################################################################################
-            if self.__early_stopping(accuracy_validation, loss_validation, e):
-                break
+            if self.__activate_early_stopping:
+                if self.__early_stopping(accuracy_validation, loss_validation, e):
+                    break
             # Update the flag
             self.__last_loss_validation = loss_validation
             self.__last_loss_train = loss_train
