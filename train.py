@@ -1,3 +1,9 @@
+########################################################
+# Train neural network file
+# Author: Muhammed El-Yamani
+# muhammedelyamani92@gmail.com
+# September 2020
+########################################################
 import numpy as np
 from data_prep import features_train, targets_train, features_validation, targets_validation, features_test, targets_test
 from sys import exit
@@ -25,11 +31,11 @@ def main():
 class NeuralNetwork:
 
     def __init__(self, activate_hidden_layers=True, hidden_layers=(2,),
-                 epochs=1000, learning_rate=0.15, activate_early_stopping=True,
-                 activate_regularization=True, regularization_type='L2', reg_factor=0.17,
+                 epochs=1000, learning_rate=0.1, activate_early_stopping=True,
+                 activate_regularization=True, regularization_type='L2', reg_factor=0.05, enhance_weights=False,
                  bias=True, jumps=1, type_loss_function="CE",
                  type_activation_hidden="sigmoid",
-                 debug=True, graph=True, random_seed=42, display_weights=False):
+                 debug=False, graph=True, random_seed=42, display_weights=True):
         """
         [describe]: initialize hyper parameters
 
@@ -52,6 +58,10 @@ class NeuralNetwork:
 
         @param [reg_factor]: How much you want to penalize large weights
         if this factor is large you want to penalize so much and vice versa
+
+        @param [enhance_weights]: if it is true, instead of weight decay to decrease the weights,
+        the weigts will increase, but it will increase the model for overfitting. 
+        it is active if  activate_regularization is true
 
         @param [bias]: Add bias (shift the boundary descition) or Not
 
@@ -79,6 +89,7 @@ class NeuralNetwork:
         self.__activate_regularization = activate_regularization  # To penalize high weights
         self.__regularization_type = regularization_type  # L1 / L2
         self.__reg_factor = reg_factor
+        self.__enhance_weights = enhance_weights
         self.__bias = bias  # add bias or not
         self.__jumps = jumps  # jumps on epochs as sensetive tunning for epochs
         self.__type_loss_function = type_loss_function  # 'CE' / 'SE'
@@ -178,6 +189,8 @@ class NeuralNetwork:
         self.__updateWeights(x)
 
     def __lossError(self, loss_function, y, output):
+        # under test
+
         return loss_function(y, output) + self.__regularization_term()
 
     def __regularization_term(self):
@@ -276,7 +289,13 @@ class NeuralNetwork:
                     derivative_reg_term[self.__weights[i] < 0] = -1
                     derivative_reg_term *= self.__reg_factor
                     # update the gradient because of the regularization
-                gradient += derivative_reg_term
+                if self.__enhance_weights:
+                    # motivate the  weights to increase
+                    gradient += derivative_reg_term
+                else:
+                    # The normal regularization
+                    # punch increasing weights to decrease
+                    gradient -= derivative_reg_term
             del_w = self.__learning_rate * gradient
             self.__weights[i] += del_w
 
@@ -318,7 +337,7 @@ class NeuralNetwork:
         #     return True
 
         if epoch_step % (self.__jumps) == 0:
-            if self.__last_loss_validation and loss_validation > self.__last_loss_validation:
+            if self.__last_loss_validation and loss_validation >= self.__last_loss_validation:
                 return True
 
         return False
@@ -376,13 +395,13 @@ class NeuralNetwork:
                 self. __Display_results(
                     self.__last_loss_validation, loss_validation, accuracy_validation, "Validation")
 
-            #########################################################################################
-            if self.__activate_early_stopping:
-                if self.__early_stopping(accuracy_validation, loss_validation, e):
-                    break
-            # Update the flag
-            self.__last_loss_validation = loss_validation
-            self.__last_loss_train = loss_train
+                #########################################################################################
+                if self.__activate_early_stopping:
+                    if self.__early_stopping(accuracy_validation, loss_validation, e):
+                        break
+                # Update the flag
+                self.__last_loss_validation = loss_validation
+                self.__last_loss_train = loss_train
         if self.__display_weights:
             for i, weight in enumerate(self.__weights):
                 print(f"\n==========weight{i+1}==========")
