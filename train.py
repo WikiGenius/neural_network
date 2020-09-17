@@ -32,8 +32,9 @@ class NeuralNetwork:
 
     def __init__(self, activate_hidden_layers=True, hidden_layers=(2,),
                  epochs=1000, learning_rate=0.1, activate_early_stopping=True,
-                 activate_regularization=True, regularization_type='L2', reg_factor=0.05, enhance_weights=False,
-                 bias=True, jumps=1, type_loss_function="CE",
+                 activate_regularization=True, regularization_type='L2', reg_factor=0.01, enhance_weights=False,
+                 dropout_activate=True, dropout_bias=True, prob_dropout_input=0.2, prob_dropout_hidden=0.5,
+                 bias=True, jumps=10, type_loss_function="CE",
                  type_activation_hidden="sigmoid",
                  debug=False, graph=True, random_seed=42, display_weights=True):
         """
@@ -63,6 +64,10 @@ class NeuralNetwork:
         the weigts will increase, but it will increase the model for overfitting. 
         it is active if  activate_regularization is true
 
+        @param [prob_dropout_input]: Probabilty that randomly ignore(dropout) nodes in the input layer
+
+        @param [prob_dropout_hidden]: Probabilty that randomly ignore(dropout) nodes in the hidden layer
+
         @param [bias]: Add bias (shift the boundary descition) or Not
 
         @param [jumps]: jumps on epochs as sensetive tunning for epochs
@@ -90,6 +95,13 @@ class NeuralNetwork:
         self.__regularization_type = regularization_type  # L1 / L2
         self.__reg_factor = reg_factor
         self.__enhance_weights = enhance_weights
+        #######################################################################################
+        # To decrease the overfitting and enhance the training
+        self.__dropout_activate = dropout_activate
+        self.__dropout_bias = dropout_bias
+        self.__prob_dropout_input = prob_dropout_input
+        self.__prob_dropout_hidden = prob_dropout_hidden
+        #######################################################################################
         self.__bias = bias  # add bias or not
         self.__jumps = jumps  # jumps on epochs as sensetive tunning for epochs
         self.__type_loss_function = type_loss_function  # 'CE' / 'SE'
@@ -105,11 +117,11 @@ class NeuralNetwork:
         self.__last_loss_train = None
         self.__last_loss_validation = None
         #######################################################################################
-
         self.__weights = []
         self.__in_layers = []
         self.__out_layers = []
         self.__error_terms = []
+        self.__dropout_layers = []  # Add dropout layers
 
     def __extract_metadata(self, features, targets):
         self.__n_records, self.__n_features = features.shape
@@ -117,6 +129,41 @@ class NeuralNetwork:
             self.__n_classes = 1
         else:
             _, self.__n_classes = targets.shape
+
+    def __decision_dropout(self, probability, num):
+        return np.random.choice([0, 1], size=num, p=[probability, 1 - probability])
+
+    def __add_dropout_layers(self):
+        if not self.__dropout_activate:
+            return
+
+        # initialize self.__dropout_layers
+        n_weights = len(self.__weights)
+        self.__dropout_layers = [None for _ in range(n_weights)]
+
+        # rows of weights
+        for i, weight in enumerate(self.__weights):
+            # number of nodes in each layer
+            number_nodes = weight.shape[0]
+            if self.__bias and not self.__dropout_bias:
+                number_nodes -= 1
+            # assign the values of self.__dropout_layers
+            if i == 0:
+                # the input layer
+                dropout_layer = self.__decision_dropout(
+                    self.__prob_dropout_input, number_nodes)
+            else:
+                # the hidden layers
+                dropout_layer = self.__decision_dropout(
+                    self.__prob_dropout_hidden, number_nodes)
+            if self.__bias and not self.__dropout_bias:
+                dropout_layer = np.r_[dropout_layer, np.ones(1)]
+
+            self.__dropout_layers[i] = dropout_layer
+
+    def __construct_NN(self):
+        # Add the weights for the NN
+        self.__addWeights()
 
     def __addWeights(self):
         # intialize number of the hidden layers if there is no any hidden layer
@@ -135,7 +182,7 @@ class NeuralNetwork:
             self.__weights[i] = np.random.normal(loc=0, scale=np.power(self.__n_features, -0.5),
                                                  size=(n_rows, self.__hidden_layers[i]))
             # update number of rows of the matrix weight
-            n_rows = self.__hidden_layers[i] + + self.__bias
+            n_rows = self.__hidden_layers[i] + self.__bias
         # The weights connect the layer(input or hidden) with output layer
         self.__weights[-1] = np.random.normal(loc=0, scale=np.power(self.__n_features, -0.5),
                                               size=(n_rows, self.__n_classes))
@@ -149,7 +196,7 @@ class NeuralNetwork:
     def __sigmoid_prime(self, x):
         return self.__sigmoid(x) * (1-self.__sigmoid(x))
 
-    def __feedForward(self, x):
+    def __feedForward(self, x, train=False):
         """
         [describe] Take input (data or signal) and return the output
         Make the whole calculations feedforward in the NN
@@ -163,6 +210,7 @@ class NeuralNetwork:
         # initialize in_signal that inputs into the the neurons
         in_signal = x
         for i in range(n_weights):
+
             # Add bias to in_signal if its true
             if self.__bias:
                 if in_signal.ndim == 1:
@@ -171,9 +219,11 @@ class NeuralNetwork:
                 else:
                     m_rows = in_signal.shape[0]
                     in_signal = np.c_[in_signal, np.ones(m_rows)]
-
+            if self.__dropout_activate and train:
+                in_signal *= self.__dropout_layers[i]
             # linear combinations
             self.__in_layers[i] = np.dot(in_signal, self.__weights[i])
+            # Apply the activation function
             self.__out_layers[i] = self.__activation(
                 self.__sigmoid, self.__in_layers[i])
             # update in_signal
@@ -262,6 +312,7 @@ class NeuralNetwork:
                 in_signal = x
             else:
                 in_signal = self.__out_layers[i-1]
+
             # Add bias to in_signal if its true
             if self.__bias:
                 if in_signal.ndim == 1:
@@ -270,6 +321,9 @@ class NeuralNetwork:
                 else:
                     m_rows = in_signal.shape[0]
                     in_signal = np.c_[in_signal, np.ones(m_rows)]
+
+            if self.__dropout_activate:
+                in_signal *= self.__dropout_layers[i]
 
             error_term = self.__error_terms[i]
             gradient = None
@@ -355,8 +409,8 @@ class NeuralNetwork:
         # extract metadata from the data to train the NN
         self.__extract_metadata(features_train, targets_train)
         # #########################################################################################
-        # Add the weights for the NN
-        self.__addWeights()
+        # Construct the neural network
+        self.__construct_NN()
         #########################################################################################
         # initialize train_errors for visualization
         if self.__graph:
@@ -368,8 +422,15 @@ class NeuralNetwork:
             #########################################################################################
             # Iterate over each data point
             for (x, y) in zip(features_train, targets_train):
+                # Add dropout layers if self.__dropout_activate
+                self.__add_dropout_layers()
                 # Feed Forward process
-                output = self.__feedForward(x)
+                output = self.__feedForward(x, train=True)
+                if self.__debug:
+                    print(f"X:\n{x}")
+                    for i in range(len(self.__in_layers)):
+                        print(f"h[{i+1}]\n{self.__in_layers[i]}")
+                        print(f"a[{i+1}]\n{self.__out_layers[i]}")
                 # Backpropagation process
                 self.__backpropagation(x, y, output)
 
@@ -386,7 +447,7 @@ class NeuralNetwork:
             #########################################################################################
             # Show resuluts over each tenths epochs
             if e % (self.__jumps) == 0:
-                print("\n========== Epoch", e, "==========")
+                print("\n========== Epoch", e + 1, "==========")
 
                 #########################################################################################
                 # Display the results
@@ -463,7 +524,9 @@ class NeuralNetwork:
                 self.__feedForward(np.array([X1[i, j], X2[i, j]]))
                 Z[i, j] = self.__in_layers[-1]
 
-        plt.contour(X1, X2, Z, levels=[0])
+        contour = plt.contour(X1, X2, Z, levels=[0])
+        # plt.clabel(contour, colors='k', fmt='%2.1f', fontsize=12)
+
         ax.set_title('Boundary line')
         ax.set_xlabel('X1')
         ax.set_ylabel('X2')
