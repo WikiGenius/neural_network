@@ -6,7 +6,7 @@ def main():
     # get prepared data
     train_validation_test = prepare(
         csv_file='data.csv', fields=['x1', 'x2'], label='y',
-        split=True, validation_split=True, dummy_var=None, debug=False)
+        split=True, validation_split=True, dummy_var=None, debug=True)
     return train_validation_test
 
 

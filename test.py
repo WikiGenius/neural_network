@@ -1,15 +1,9 @@
-# import random
+from scipy import stats
 import numpy as np
-# np.random.seed(42)
+from data_prep import features_train
+# l = [0, 1, 2, -4, -3]
+# x = np.array(l)
 
-
-def decision_dropout(probability, num):
-    return np.random.choice([0, 1], size=num, p=[probability, 1 - probability])
-
-
-# x = decision_dropout(0.2, 10)
-l = list()
-for i in range(100):
-    l.append(decision_dropout(0.2, 10))
-l = np.array(l)
-print(l.sum(axis=1).sum()/10)
+x = np.array(features_train)
+print(x)
+print(np.maximum(0,x))

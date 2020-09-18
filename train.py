@@ -7,6 +7,7 @@
 import numpy as np
 from data_prep import features_train, targets_train, features_validation, targets_validation, features_test, targets_test
 from sys import exit
+from scipy import stats
 
 import matplotlib.pyplot as plt
 
@@ -32,11 +33,11 @@ class NeuralNetwork:
 
     def __init__(self, activate_hidden_layers=True, hidden_layers=(2,),
                  epochs=1000, learning_rate=0.1, activate_early_stopping=True,
-                 activate_regularization=True, regularization_type='L2', reg_factor=0.01, enhance_weights=False,
+                 activate_regularization=True, regularization_type='L2', reg_factor=0.001, enhance_weights=False,
                  dropout_activate=True, dropout_bias=True, prob_dropout_input=0.2, prob_dropout_hidden=0.5,
-                 bias=True, jumps=10, type_loss_function="CE",
-                 type_activation_hidden="sigmoid",
-                 debug=False, graph=True, random_seed=42, display_weights=True):
+                 bias=True, jumps=1, type_loss_function="CE",
+                 type_activation_hidden="relu",
+                 debug=True, graph=True, random_seed=42, display_weights=False, display_stat_layers=False):
         """
         [describe]: initialize hyper parameters
 
@@ -109,6 +110,7 @@ class NeuralNetwork:
         self.__graph = graph
         self.__debug = debug
         self.__display_weights = display_weights
+        self.__display_stat_layers = display_stat_layers
         self.__n_records = None
         self.__n_features = None
         self.__n_classes = None
@@ -129,6 +131,32 @@ class NeuralNetwork:
             self.__n_classes = 1
         else:
             _, self.__n_classes = targets.shape
+
+    def __addWeights(self):
+        # intialize number of the hidden layers if there is no any hidden layer
+        n_hidden_layers = 0
+        # If there are hidden layers
+        if(self.__activate_hidden_layers):
+            n_hidden_layers = len(self.__hidden_layers)
+
+        self.__weights = [None for _ in range(n_hidden_layers + 1)]
+
+        n_rows = self.__n_features + self.__bias
+        # It will iterate if there are hidden layers
+        # if self.__activate_hidden_layers is true
+        for i in range(len(self.__weights) - 1):
+            # The weights connect the (input layer or hidden layer) with other hidden layers
+            self.__weights[i] = np.random.normal(loc=0, scale=np.power(self.__n_features, -0.5),
+                                                 size=(n_rows, self.__hidden_layers[i]))
+            # update number of rows of the matrix weight
+            n_rows = self.__hidden_layers[i] + self.__bias
+        # The weights connect the layer(input or hidden) with output layer
+        self.__weights[-1] = np.random.normal(loc=0, scale=np.power(self.__n_features, -0.5),
+                                              size=(n_rows, self.__n_classes))
+
+    def __construct_NN(self):
+        # Add the weights for the NN
+        self.__addWeights()
 
     def __decision_dropout(self, probability, num):
         return np.random.choice([0, 1], size=num, p=[probability, 1 - probability])
@@ -161,40 +189,52 @@ class NeuralNetwork:
 
             self.__dropout_layers[i] = dropout_layer
 
-    def __construct_NN(self):
-        # Add the weights for the NN
-        self.__addWeights()
+    def __softmax(self, L):
+        # take the exponitial for array L
+        expL = np.exp(L)
+        # take the sum of exponitial for array L
+        sumExpL = np.sum(expL)
+        probabilities = np.divide(expL, sumExpL)
 
-    def __addWeights(self):
-        # intialize number of the hidden layers if there is no any hidden layer
-        n_hidden_layers = 0
-        # If there are hidden layers
-        if(self.__activate_hidden_layers):
-            n_hidden_layers = len(self.__hidden_layers)
-
-        self.__weights = [None for _ in range(n_hidden_layers + 1)]
-
-        n_rows = self.__n_features + self.__bias
-        # It will iterate if there are hidden layers
-        # if self.__activate_hidden_layers is true
-        for i in range(len(self.__weights) - 1):
-            # The weights connect the (input layer or hidden layer) with other hidden layers
-            self.__weights[i] = np.random.normal(loc=0, scale=np.power(self.__n_features, -0.5),
-                                                 size=(n_rows, self.__hidden_layers[i]))
-            # update number of rows of the matrix weight
-            n_rows = self.__hidden_layers[i] + self.__bias
-        # The weights connect the layer(input or hidden) with output layer
-        self.__weights[-1] = np.random.normal(loc=0, scale=np.power(self.__n_features, -0.5),
-                                              size=(n_rows, self.__n_classes))
-
-    def __activation(self, activation_function, x):
-        return activation_function(x)
+        return probabilities
 
     def __sigmoid(self, x):
         return 1/(1+np.exp(-x))
 
-    def __sigmoid_prime(self, x):
-        return self.__sigmoid(x) * (1-self.__sigmoid(x))
+    def __tanh(self, x):
+        return (np.exp(x) - np.exp(-x))/(np.exp(x) + np.exp(-x))
+
+    def __relu(self, x):
+        return np.maximum(0,x)
+
+    def __activation(self, layer_i, n_layers, x):
+        """
+        Calculate the activation function for input
+        @param [layer_i]: layer i
+        @param [n_layers]: number of layers
+        @param [x]: input
+        """
+        if layer_i == n_layers - 1:
+            # output layer
+            if self.__n_classes == 1:
+                # binary class
+                self.__out_layers[layer_i] = self.__sigmoid(x)
+            else:
+                # multi classes
+                self.__out_layers[layer_i] = self.__softmax(x)
+        else:
+            # hidden layers
+            if self.__type_activation_hidden == 'sigmoid':
+                self.__out_layers[layer_i] = self.__sigmoid(x)
+            elif self.__type_activation_hidden == 'relu':
+                self.__out_layers[layer_i] = self.__relu(x)
+            elif self.__type_activation_hidden == 'tanh':
+                self.__out_layers[layer_i] = self.__tanh(x)
+            else:
+                print('In hidden layers')
+                print(
+                    f"There is no definition for activation function {self.__type_activation_hidden}")
+                exit(2)
 
     def __feedForward(self, x, train=False):
         """
@@ -224,65 +264,49 @@ class NeuralNetwork:
             # linear combinations
             self.__in_layers[i] = np.dot(in_signal, self.__weights[i])
             # Apply the activation function
-            self.__out_layers[i] = self.__activation(
-                self.__sigmoid, self.__in_layers[i])
+            self.__activation(i, n_weights, self.__in_layers[i])
             # update in_signal
             in_signal = self.__out_layers[i]
         output = self.__out_layers[-1]
         return output
 
-    def __backpropagation(self, x, y, output):
-        # Caluclate the error_terms
-        self.__calculate_error_terms(y, output)
-        #########################################################################################
-        # Update weights
-        self.__updateWeights(x)
-
-    def __lossError(self, loss_function, y, output):
-        # under test
-
-        return loss_function(y, output) + self.__regularization_term()
-
-    def __regularization_term(self):
-        if self.__activate_regularization:
-            termsSum = 0
-            for weight in self.__weights:
-                if self.__regularization_type == 'L1':
-                    term = np.abs(weight)
-                elif self.__regularization_type == 'L2':
-                    term = np.power(weight, 2)/2
-
-                termsSum += np.sum(term)
-            reg_term = self.__reg_factor * termsSum
-            return reg_term
+    def __activation_hidden_prime(self, output_hidden_activation):
+        """
+        [describe] The derivative the choice activation function with respect input_activation
+        @param [output_activation] if not None used for performance
+        @param [input_activation] if not None used if the output_activation not exist
+        """
+        if self.__type_activation_hidden == 'sigmoid':
+            return output_hidden_activation * (1 - output_hidden_activation)
+        elif self.__type_activation_hidden == 'relu':
+            return output_hidden_activation >= 0
+        elif self.__type_activation_hidden == 'tanh':
+            return (1 - np.power(output_hidden_activation, 2))
         else:
-            return 0
-
-    def __square_error(self, y, output):
-        if self.__n_classes == 1:
-            return (y-output)**2
-        else:
-            return
-
-    def __cross_entropy(self, y, output):
-        epsilon = 10**-10
-        if self.__n_classes == 1:
-            return -y * np.log(output + epsilon) - (1-y)*np.log(1-output + epsilon)
-        else:
-            return - np.dot(y, np.log(output + epsilon))
+            print('In hidden layers')
+            print(
+                f"There is no definition for derivative activation function {self.__type_activation_hidden}")
+            exit(4)
+        pass
 
     def __calculate_out_error_term(self, y, output):
         # It depends on the type of loss function and the activation function
         # I used activation function sigmoid here assuming, I have binary class, for simplicity
         # I will update it to be more general
         y = np.array(y).reshape(output.shape)
-        error = y - output
-        if error.ndim == 1:
-            error = error.reshape(1, -1)
-        if self.__type_loss_function == 'CE':  # Cross Entopy
-            return error
-        elif self.__type_loss_function == 'SE':  # Square Error
-            return error * output * (1 - output)
+        if self.__n_classes == 1:
+            # Using sigmoid activation
+            error = y - output
+            if error.ndim == 1:
+                error = error.reshape(1, -1)
+            if self.__type_loss_function == 'CE':  # Cross Entopy
+                return error
+            elif self.__type_loss_function == 'SE':  # Square Error
+                return error * output * (1 - output)
+        else:
+            # multi classes
+            print("Needs softmax function")
+            exit(3)
 
     def __calculate_error_terms(self, y, output):
         n_weights = len(self.__weights)
@@ -296,12 +320,8 @@ class NeuralNetwork:
                 w = w[:-1, :]
             error = np.matmul(self.__error_terms[i + 1], w.T)
             activation_prime = None
-            if self.__type_activation_hidden == 'sigmoid':
-                out_layer = self.__out_layers[i]
-                activation_prime = out_layer * (1 - out_layer)
-            else:
-                print("Need other activation function")
-                exit(1)
+            out_layer = self.__out_layers[i]
+            activation_prime = self.__activation_hidden_prime(out_layer)
             self.__error_terms[i] = error * activation_prime
 
     def __updateWeights(self, x):
@@ -354,6 +374,46 @@ class NeuralNetwork:
             self.__weights[i] += del_w
 
         pass
+
+    def __backpropagation(self, x, y, output):
+        # Caluclate the error_terms
+        self.__calculate_error_terms(y, output)
+        #########################################################################################
+        # Update weights
+        self.__updateWeights(x)
+
+    def __regularization_term(self):
+        if self.__activate_regularization:
+            termsSum = 0
+            for weight in self.__weights:
+                if self.__regularization_type == 'L1':
+                    term = np.abs(weight)
+                elif self.__regularization_type == 'L2':
+                    term = np.power(weight, 2)/2
+
+                termsSum += np.sum(term)
+            reg_term = self.__reg_factor * termsSum
+            return reg_term
+        else:
+            return 0
+
+    def __square_error(self, y, output):
+        if self.__n_classes == 1:
+            return (y-output)**2
+        else:
+            return
+
+    def __cross_entropy(self, y, output):
+        epsilon = 10**-10
+        if self.__n_classes == 1:
+            return -y * np.log(output + epsilon) - (1-y)*np.log(1-output + epsilon)
+        else:
+            return - np.dot(y, np.log(output + epsilon))
+
+    def __lossError(self, loss_function, y, output):
+        # under test
+
+        return loss_function(y, output) + self.__regularization_term()
 
     def __loss_accuracy(self, features, targets):
         # Descide what loss function type you will use
@@ -426,14 +486,16 @@ class NeuralNetwork:
                 self.__add_dropout_layers()
                 # Feed Forward process
                 output = self.__feedForward(x, train=True)
-                if self.__debug:
-                    print(f"X:\n{x}")
+                if self.__display_stat_layers:
+                    print("statistcs of the nerons")
+                    print(f"X:\n{stats.describe(x)}")
                     for i in range(len(self.__in_layers)):
-                        print(f"h[{i+1}]\n{self.__in_layers[i]}")
-                        print(f"a[{i+1}]\n{self.__out_layers[i]}")
+                        print(
+                            f"h[{i+1}]\n{stats.describe(np.array(self.__in_layers[i]))}")
+                        print(
+                            f"a[{i+1}]\n{stats.describe(np.array(self.__out_layers[i]))}")
                 # Backpropagation process
                 self.__backpropagation(x, y, output)
-
             # Caluclate Loss function and accuracy over each epoch
             loss_train, accuracy_train = self.__loss_accuracy(
                 features_train, targets_train)
