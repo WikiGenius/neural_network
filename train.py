@@ -31,12 +31,12 @@ def main():
 
 class NeuralNetwork:
 
-    def __init__(self, activate_hidden_layers=True, hidden_layers=(10,2),
-                 epochs=100, learning_rate=0.1, activate_early_stopping=True,
-                 activate_regularization=True, regularization_type='L2', reg_factor=0.001, enhance_weights=False,
-                 dropout_activate=True, dropout_bias=True, prob_dropout_input=0.2, prob_dropout_hidden=0.2,
-                 bias=True, jumps=1, type_loss_function="CE",
-                 type_activation_hidden="relu",
+    def __init__(self, activate_hidden_layers=True, hidden_layers=(2,),
+                 epochs=100, learning_rate=0.5, activate_early_stopping=True,
+                 activate_regularization=False, regularization_type='L2', reg_factor=0.01, enhance_weights=False,
+                 dropout_activate=False, dropout_bias=True, prob_dropout_input=0.2, prob_dropout_hidden=0.5,
+                 bias=True, jumps=10, type_loss_function="CE",
+                 type_activation_hidden="elu", ELU_factor=1,
                  debug=False, graph=True, random_seed=42, display_weights=False, display_stat_layers=False):
         """
         [describe]: initialize hyper parameters
@@ -78,6 +78,9 @@ class NeuralNetwork:
 
         @param [type_activation_hidden]: The activation function on the hidden layers
 
+        @param [ELU_factor]: hyper parameter >= 0 used in ELU activation function
+        -> Notice if ELU_factor is 0 then it becomes Relu activation fuction
+
         @param [debug]: debug or not
 
         @param [graph]: To graph the graphs
@@ -107,6 +110,7 @@ class NeuralNetwork:
         self.__jumps = jumps  # jumps on epochs as sensetive tunning for epochs
         self.__type_loss_function = type_loss_function  # 'CE' / 'SE'
         self.__type_activation_hidden = type_activation_hidden  # "sigmoid"
+        self.__ELU_factor = ELU_factor
         self.__graph = graph
         self.__debug = debug
         self.__display_weights = display_weights
@@ -205,6 +209,9 @@ class NeuralNetwork:
     def __tanh(self, x):
         return (np.exp(x) - np.exp(-x))/(np.exp(x) + np.exp(-x))
 
+    def __elu(self, x):
+        return np.where(x > 0, x, self.__ELU_factor * (np.exp(x) - 1))
+
     def __relu(self, x):
         return np.maximum(0, x)
 
@@ -231,6 +238,9 @@ class NeuralNetwork:
                 self.__out_layers[layer_i] = self.__relu(x)
             elif self.__type_activation_hidden == 'tanh':
                 self.__out_layers[layer_i] = self.__tanh(x)
+            elif self.__type_activation_hidden == 'elu':
+                self.__out_layers[layer_i] = self.__elu(x)
+
             else:
                 print('In hidden layers')
                 print(
@@ -271,18 +281,23 @@ class NeuralNetwork:
         output = self.__out_layers[-1]
         return output
 
-    def __activation_hidden_prime(self, output_hidden_activation):
+    def __activation_hidden_prime(self, hidden_layer_i):
         """
         [describe] The derivative the choice activation function with respect input_activation
-        @param [output_activation] if not None used for performance
-        @param [input_activation] if not None used if the output_activation not exist
+        @param [hidden_layer_i] used to get
+        [output_activation] if not None used for performance
+        [input_activation] if not None used if the output_activation not exist
         """
+        output_hidden_activation = self.__out_layers[hidden_layer_i]
         if self.__type_activation_hidden == 'sigmoid':
             return output_hidden_activation * (1 - output_hidden_activation)
         elif self.__type_activation_hidden == 'relu':
             return output_hidden_activation >= 0
         elif self.__type_activation_hidden == 'tanh':
             return (1 - np.power(output_hidden_activation, 2))
+        elif self.__type_activation_hidden == 'elu':
+            x = self.__in_layers[hidden_layer_i]
+            return np.where(x > 0, 1, self.__ELU_factor * np.exp(x))
         else:
             print('In hidden layers')
             print(
@@ -320,9 +335,7 @@ class NeuralNetwork:
                 # Dont take last row in calculations
                 w = w[:-1, :]
             error = np.matmul(self.__error_terms[i + 1], w.T)
-            activation_prime = None
-            out_layer = self.__out_layers[i]
-            activation_prime = self.__activation_hidden_prime(out_layer)
+            activation_prime = self.__activation_hidden_prime(i)
             self.__error_terms[i] = error * activation_prime
 
     def __updateWeights(self, x):
@@ -529,7 +542,7 @@ class NeuralNetwork:
             if e % (self.__jumps) == 0:
                 self.__last_loss_validation = loss_validation
                 self.__last_loss_train = loss_train
-        
+
         if self.__display_weights:
             for i, weight in enumerate(self.__weights):
                 print(f"\n==========weight{i+1}==========")
