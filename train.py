@@ -31,13 +31,13 @@ def main():
 
 class NeuralNetwork:
 
-    def __init__(self, activate_hidden_layers=True, hidden_layers=(2,),
-                 epochs=1000, learning_rate=0.1, activate_early_stopping=True,
+    def __init__(self, activate_hidden_layers=True, hidden_layers=(10,2),
+                 epochs=100, learning_rate=0.1, activate_early_stopping=True,
                  activate_regularization=True, regularization_type='L2', reg_factor=0.001, enhance_weights=False,
-                 dropout_activate=True, dropout_bias=True, prob_dropout_input=0.2, prob_dropout_hidden=0.5,
+                 dropout_activate=True, dropout_bias=True, prob_dropout_input=0.2, prob_dropout_hidden=0.2,
                  bias=True, jumps=1, type_loss_function="CE",
                  type_activation_hidden="relu",
-                 debug=True, graph=True, random_seed=42, display_weights=False, display_stat_layers=False):
+                 debug=False, graph=True, random_seed=42, display_weights=False, display_stat_layers=False):
         """
         [describe]: initialize hyper parameters
 
@@ -199,13 +199,14 @@ class NeuralNetwork:
         return probabilities
 
     def __sigmoid(self, x):
+        # print("x in sigmoid function\n",x)
         return 1/(1+np.exp(-x))
 
     def __tanh(self, x):
         return (np.exp(x) - np.exp(-x))/(np.exp(x) + np.exp(-x))
 
     def __relu(self, x):
-        return np.maximum(0,x)
+        return np.maximum(0, x)
 
     def __activation(self, layer_i, n_layers, x):
         """
@@ -449,7 +450,9 @@ class NeuralNetwork:
         # if accuracy_validation == 1:
         #     print("accuracy_validation = 1")
         #     return True
-
+        if loss_validation <= 1e-04:
+            print("loss_validation reached almost zero!")
+            return True
         if epoch_step % (self.__jumps) == 0:
             if self.__last_loss_validation and loss_validation >= self.__last_loss_validation:
                 return True
@@ -519,12 +522,14 @@ class NeuralNetwork:
                     self.__last_loss_validation, loss_validation, accuracy_validation, "Validation")
 
                 #########################################################################################
-                if self.__activate_early_stopping:
-                    if self.__early_stopping(accuracy_validation, loss_validation, e):
-                        break
-                # Update the flag
+            if self.__activate_early_stopping:
+                if self.__early_stopping(accuracy_validation, loss_validation, e):
+                    break
+            # Update the flag each jump
+            if e % (self.__jumps) == 0:
                 self.__last_loss_validation = loss_validation
                 self.__last_loss_train = loss_train
+        
         if self.__display_weights:
             for i, weight in enumerate(self.__weights):
                 print(f"\n==========weight{i+1}==========")

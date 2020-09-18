@@ -17,9 +17,11 @@ train.py:132: RuntimeWarning: divide by zero encountered in log
   return -y * np.log(output) - (1-y)*np.log(1-output)
 train.py:132: RuntimeWarning: invalid value encountered in multiply
   return -y * np.log(output) - (1-y)*np.log(1-output)
+
+7_Need other activation function like softmax, Relu done
+
 BUG:
  train.py:136: RuntimeWarning: overflow encountered in exp
   return 1/(1+np.exp(-x))
   
-7_Need other activation function like softmax, Relu
 8_Add JSON file collects all the atributes in one place
