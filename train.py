@@ -1,3 +1,4 @@
+#!python
 ########################################################
 # Train neural network file
 # Author: Muhammed El-Yamani
@@ -32,12 +33,12 @@ def main():
 class NeuralNetwork:
 
     def __init__(self, activate_hidden_layers=True, hidden_layers=(2,),
-                 epochs=100, learning_rate=0.5, activate_early_stopping=True,
+                 epochs=100, learning_rate=0.2, activate_early_stopping=True,
                  activate_regularization=False, regularization_type='L2', reg_factor=0.01, enhance_weights=False,
                  dropout_activate=False, dropout_bias=True, prob_dropout_input=0.2, prob_dropout_hidden=0.5,
                  bias=True, jumps=10, type_loss_function="CE",
                  type_activation_hidden="elu", ELU_factor=1,
-                 debug=False, graph=True, random_seed=42, display_weights=False, display_stat_layers=False):
+                 debug=True, graph=True, random_seed=42, display_weights=False, display_stat_layers=False):
         """
         [describe]: initialize hyper parameters
 
@@ -502,6 +503,7 @@ class NeuralNetwork:
                 self.__add_dropout_layers()
                 # Feed Forward process
                 output = self.__feedForward(x, train=True)
+                
                 if self.__display_stat_layers:
                     print("statistcs of the nerons")
                     print(f"X:\n{stats.describe(x)}")

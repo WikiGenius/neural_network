@@ -1,3 +1,12 @@
+#!python
+
+########################################################
+# data preperation for training network file
+# Author: Muhammed El-Yamani
+# muhammedelyamani92@gmail.com
+# September 2020
+########################################################
+
 import numpy as np
 import pandas as pd
 
@@ -5,8 +14,8 @@ import pandas as pd
 def main():
     # get prepared data
     train_validation_test = prepare(
-        csv_file='xor.csv', fields=['x1', 'x2'], label='y',
-        split=False, validation_split=True, dummy_var=None, debug=False)
+        csv_file='data/data.csv', fields=['x1', 'x2'], label='y',
+        split=True, validation_split=True, dummy_var=None, debug=True)
     return train_validation_test
 
 

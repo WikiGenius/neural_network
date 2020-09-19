@@ -12,16 +12,21 @@ _ Orgnize train function > done
 train.py:407: UserWarning: No contour levels were found within the data range.
   plt.contour(X1, X2, Z, levels=[0])
 4_ Add regulization term for the error function -> done
-5_Fix this bug done
+5_Fix this bug > done
 train.py:132: RuntimeWarning: divide by zero encountered in log
   return -y * np.log(output) - (1-y)*np.log(1-output)
 train.py:132: RuntimeWarning: invalid value encountered in multiply
   return -y * np.log(output) - (1-y)*np.log(1-output)
 
-7_Need other activation function like softmax, Relu done
+7_Need other activation function like softmax, Relu > done
 
 BUG:
  train.py:136: RuntimeWarning: overflow encountered in exp
   return 1/(1+np.exp(-x))
   
-8_Add JSON file collects all the atributes in one place
+8_ Add batches
+9_ Add Momentum
+10_ adaptive learning rate
+
+11_Add JSON file collects all the atributes in one place
+12_ save weights in files for testing later
