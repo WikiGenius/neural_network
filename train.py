@@ -33,7 +33,7 @@ def main():
 class NeuralNetwork:
 
     def __init__(self, activate_hidden_layers=True, hidden_layers=(2,),
-                 epochs=100, batch_size=32, learning_rate=0.95, activate_early_stopping=True,
+                 epochs=100, batch_size=32, learning_rate=0.95, beta=0.9, activate_early_stopping=True,
                  activate_regularization=True, regularization_type='L2', reg_factor=0.01, enhance_weights=False,
                  dropout_activate=False, dropout_bias=True, prob_dropout_input=0.2, prob_dropout_hidden=0.5,
                  bias=True, jumps=1, type_loss_function="CE",
@@ -54,6 +54,8 @@ class NeuralNetwork:
             N  -> MBGD (Update weights after each N training examples)
 
         @param [learning_rate]: scaling the gradient descent to improve the stability of learning
+
+        @param [beta]: hyper parameter beta for momentum between (0,1) recommended 0.9
 
         @param [activate_early_stopping]: if activated the algorithm early stopping
         will run to tune(stop) the epochs and prevent the trainning from overfitting
@@ -106,6 +108,11 @@ class NeuralNetwork:
         self.__regularization_type = regularization_type  # L1 / L2
         self.__reg_factor = reg_factor
         self.__enhance_weights = enhance_weights
+        #######################################################################################
+        # Gradient Accumulation by Momentum
+        self.__gradMomentum = []  # intial all items by zero
+        # hyper parameter beta for momentum between (0,1)
+        self.__beta = beta
         #######################################################################################
         # To decrease the overfitting and enhance the training
         self.__dropout_activate = dropout_activate
@@ -172,6 +179,7 @@ class NeuralNetwork:
     def __construct_NN(self):
         # Add the weights for the NN
         self.__addWeights()
+        self.__gradMomentum = self.__del_weights.copy()
 
     def __decision_dropout(self, probability, num):
         return np.random.choice([0, 1], size=num, p=[probability, 1 - probability])
@@ -371,31 +379,32 @@ class NeuralNetwork:
                 in_signal *= self.__dropout_layers[i]
 
             error_term = self.__error_terms[i]
-            gradient = None
+            gradient_descent = None
             if in_signal.ndim == 2:
-                gradient = np.matmul(in_signal.T, error_term)
+                gradient_descent = np.matmul(in_signal.T, error_term)
             elif in_signal.ndim == 1:
-                gradient = np.matmul(in_signal[:, None], error_term)
+                gradient_descent = np.matmul(in_signal[:, None], error_term)
 
             if self.__activate_regularization:
                 if self.__regularization_type == 'L2':
                     derivative_reg_term = self.__reg_factor * self.__weights[i]
-                    # update the gradient because of the regularization
+                    # update the gradient_descent because of the regularization
                 elif self.__regularization_type == 'L1':
                     derivative_reg_term = np.array(
                         np.zeros(shape=self.__weights[i].shape))
                     derivative_reg_term[self.__weights[i] > 0] = 1
                     derivative_reg_term[self.__weights[i] < 0] = -1
                     derivative_reg_term *= self.__reg_factor
-                    # update the gradient because of the regularization
+                    # update the gradient_descent because of the regularization
                 if self.__enhance_weights:
                     # motivate the  weights to increase
-                    gradient += derivative_reg_term
+                    gradient_descent += derivative_reg_term
                 else:
                     # The normal regularization
                     # punch increasing weights to decrease
-                    gradient -= derivative_reg_term
-            del_w = gradient
+                    gradient_descent -= derivative_reg_term
+            self.__gradMomentum[i] = self.__beta * self.__gradMomentum[i] +  gradient_descent
+            del_w = self.__gradMomentum[i]
             self.__del_weights[i] += del_w
             if (self.__batch_size > 0 and size_data % (self.__batch_size) == 0) or (self.__batch_size <= 0 and size_data == self.__n_records):
                 self.__weights[i] += self.__learning_rate * \
