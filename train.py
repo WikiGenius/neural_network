@@ -33,11 +33,11 @@ def main():
 class NeuralNetwork:
 
     def __init__(self, activate_hidden_layers=True, hidden_layers=(2,),
-                 epochs=100, learning_rate=0.2, activate_early_stopping=True,
-                 activate_regularization=False, regularization_type='L2', reg_factor=0.01, enhance_weights=False,
+                 epochs=100, batch_size=32, learning_rate=0.95, activate_early_stopping=True,
+                 activate_regularization=True, regularization_type='L2', reg_factor=0.01, enhance_weights=False,
                  dropout_activate=False, dropout_bias=True, prob_dropout_input=0.2, prob_dropout_hidden=0.5,
-                 bias=True, jumps=10, type_loss_function="CE",
-                 type_activation_hidden="elu", ELU_factor=1,
+                 bias=True, jumps=1, type_loss_function="CE",
+                 type_activation_hidden="relu", ELU_factor=1,
                  debug=True, graph=True, random_seed=42, display_weights=False, display_stat_layers=False):
         """
         [describe]: initialize hyper parameters
@@ -47,6 +47,11 @@ class NeuralNetwork:
         @param [hidden_layers]: tuple of nurons in each hidden layer in order
 
         @param [epochs]: number of iterations for NN to learn
+
+        @param [batch_size]: 
+            1  -> SGD (Update weights over each training example)
+           -1  -> BGD (Update weights At end each epoch)
+            N  -> MBGD (Update weights after each N training examples)
 
         @param [learning_rate]: scaling the gradient descent to improve the stability of learning
 
@@ -94,6 +99,7 @@ class NeuralNetwork:
         self.__activate_hidden_layers = activate_hidden_layers
         self.__hidden_layers = hidden_layers
         self.__epochs = epochs
+        self.__batch_size = batch_size
         self.__learning_rate = learning_rate
         self.__activate_early_stopping = activate_early_stopping  # to tune the epochs
         self.__activate_regularization = activate_regularization  # To penalize high weights
@@ -125,6 +131,7 @@ class NeuralNetwork:
         self.__last_loss_validation = None
         #######################################################################################
         self.__weights = []
+        self.__del_weights = []
         self.__in_layers = []
         self.__out_layers = []
         self.__error_terms = []
@@ -145,6 +152,7 @@ class NeuralNetwork:
             n_hidden_layers = len(self.__hidden_layers)
 
         self.__weights = [None for _ in range(n_hidden_layers + 1)]
+        self.__del_weights = [None for _ in range(n_hidden_layers + 1)]
 
         n_rows = self.__n_features + self.__bias
         # It will iterate if there are hidden layers
@@ -153,11 +161,13 @@ class NeuralNetwork:
             # The weights connect the (input layer or hidden layer) with other hidden layers
             self.__weights[i] = np.random.normal(loc=0, scale=np.power(self.__n_features, -0.5),
                                                  size=(n_rows, self.__hidden_layers[i]))
+            self.__del_weights[i] = np.zeros(self.__weights[i].shape)
             # update number of rows of the matrix weight
             n_rows = self.__hidden_layers[i] + self.__bias
         # The weights connect the layer(input or hidden) with output layer
         self.__weights[-1] = np.random.normal(loc=0, scale=np.power(self.__n_features, -0.5),
                                               size=(n_rows, self.__n_classes))
+        self.__del_weights[-1] = np.zeros(self.__weights[-1].shape)
 
     def __construct_NN(self):
         # Add the weights for the NN
@@ -339,7 +349,7 @@ class NeuralNetwork:
             activation_prime = self.__activation_hidden_prime(i)
             self.__error_terms[i] = error * activation_prime
 
-    def __updateWeights(self, x):
+    def __updateWeights(self, x, size_data):
         n_weights = len(self.__weights)
         in_signal = None
         for i in range(n_weights-1, -1, -1):
@@ -385,17 +395,21 @@ class NeuralNetwork:
                     # The normal regularization
                     # punch increasing weights to decrease
                     gradient -= derivative_reg_term
-            del_w = self.__learning_rate * gradient
-            self.__weights[i] += del_w
+            del_w = gradient
+            self.__del_weights[i] += del_w
+            if (self.__batch_size > 0 and size_data % (self.__batch_size) == 0) or (self.__batch_size <= 0 and size_data == self.__n_records):
+                self.__weights[i] += self.__learning_rate * \
+                    self.__del_weights[i] / self.__n_records
+                self.__del_weights[i] *= 0
 
         pass
 
-    def __backpropagation(self, x, y, output):
+    def __backpropagation(self, x, y, output, size_data):
         # Caluclate the error_terms
         self.__calculate_error_terms(y, output)
         #########################################################################################
         # Update weights
-        self.__updateWeights(x)
+        self.__updateWeights(x, size_data)
 
     def __regularization_term(self):
         if self.__activate_regularization:
@@ -498,12 +512,12 @@ class NeuralNetwork:
         for e in range(self.__epochs):
             #########################################################################################
             # Iterate over each data point
-            for (x, y) in zip(features_train, targets_train):
+            for size_data, (x, y) in enumerate(zip(features_train, targets_train), start=1):
                 # Add dropout layers if self.__dropout_activate
                 self.__add_dropout_layers()
                 # Feed Forward process
                 output = self.__feedForward(x, train=True)
-                
+
                 if self.__display_stat_layers:
                     print("statistcs of the nerons")
                     print(f"X:\n{stats.describe(x)}")
@@ -513,7 +527,8 @@ class NeuralNetwork:
                         print(
                             f"a[{i+1}]\n{stats.describe(np.array(self.__out_layers[i]))}")
                 # Backpropagation process
-                self.__backpropagation(x, y, output)
+                self.__backpropagation(x, y, output, size_data)
+
             # Caluclate Loss function and accuracy over each epoch
             loss_train, accuracy_train = self.__loss_accuracy(
                 features_train, targets_train)

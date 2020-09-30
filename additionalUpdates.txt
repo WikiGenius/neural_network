@@ -24,7 +24,8 @@ BUG:
  train.py:136: RuntimeWarning: overflow encountered in exp
   return 1/(1+np.exp(-x))
   
-8_ Add batches
+8_ Add batches (BGD/SGD/MBGD) Done
+
 9_ Add Momentum
 10_ adaptive learning rate
 
